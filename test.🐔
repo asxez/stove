@@ -1,7 +1,0 @@
-import people for People
-
-define test() {
-    var test = "asxe666"
-}
-
-test()

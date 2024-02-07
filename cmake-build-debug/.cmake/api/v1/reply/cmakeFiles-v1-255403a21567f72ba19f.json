@@ -107,26 +107,6 @@
 			"path" : "F:/SoftWareSpace/clion/CLion 2022.2.3/bin/cmake/win/x64/share/cmake-3.27/Modules/CMakeCommonLanguageInclude.cmake"
 		},
 		{
-			"isCMake" : true,
-			"isExternal" : true,
-			"path" : "F:/SoftWareSpace/clion/CLion 2022.2.3/bin/cmake/win/x64/share/cmake-3.27/Modules/FindPython3.cmake"
-		},
-		{
-			"isCMake" : true,
-			"isExternal" : true,
-			"path" : "F:/SoftWareSpace/clion/CLion 2022.2.3/bin/cmake/win/x64/share/cmake-3.27/Modules/FindPython/Support.cmake"
-		},
-		{
-			"isCMake" : true,
-			"isExternal" : true,
-			"path" : "F:/SoftWareSpace/clion/CLion 2022.2.3/bin/cmake/win/x64/share/cmake-3.27/Modules/FindPackageHandleStandardArgs.cmake"
-		},
-		{
-			"isCMake" : true,
-			"isExternal" : true,
-			"path" : "F:/SoftWareSpace/clion/CLion 2022.2.3/bin/cmake/win/x64/share/cmake-3.27/Modules/FindPackageMessage.cmake"
-		},
-		{
 			"path" : "LexicalParser/CMakeLists.txt"
 		},
 		{

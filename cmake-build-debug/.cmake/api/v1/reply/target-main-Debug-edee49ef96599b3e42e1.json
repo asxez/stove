@@ -14,7 +14,6 @@
 		"commands" : 
 		[
 			"add_executable",
-			"target_link_libraries",
 			"target_include_directories"
 		],
 		"files" : 
@@ -35,12 +34,6 @@
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 13,
-				"parent" : 0
-			},
-			{
-				"command" : 2,
-				"file" : 0,
 				"line" : 10,
 				"parent" : 0
 			}
@@ -58,13 +51,8 @@
 			"includes" : 
 			[
 				{
-					"backtrace" : 3,
-					"path" : "F:/WorkSpace/c-case/stove/../LexicalParser/include"
-				},
-				{
 					"backtrace" : 2,
-					"isSystem" : true,
-					"path" : "F:/SoftWareSpace/Python/include"
+					"path" : "F:/WorkSpace/c-case/stove/../LexicalParser/include"
 				}
 			],
 			"language" : "C",
@@ -86,11 +74,6 @@
 			{
 				"fragment" : "",
 				"role" : "flags"
-			},
-			{
-				"backtrace" : 2,
-				"fragment" : "F:\\SoftWareSpace\\Python\\libs\\python310.lib",
-				"role" : "libraries"
 			},
 			{
 				"fragment" : "-lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32",

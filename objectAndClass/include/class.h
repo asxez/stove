@@ -29,7 +29,7 @@ typedef enum {
 #define OBJ_TO_VALUE(objPtr)                     \
     ({                                           \
         Value value;                             \
-        value.type == VT_OBJ;                    \
+        value.type = VT_OBJ;                    \
         value.objHeader = (ObjHeader *)(objPtr); \
         value;                                   \
     })
@@ -62,7 +62,7 @@ typedef struct {
     union {
         //指向脚本方法所关联的C语言实现
         Primitive primFUN;
-        //指向脚本代码编译后的ObjectClosure或者ObjFUN
+        //指向脚本代码编译后的ObjectClosure或者ObjFun
         ObjClosure *obj;
     };
 } Method;
