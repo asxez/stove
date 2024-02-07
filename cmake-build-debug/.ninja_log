@@ -1,0 +1,5 @@
+# ninja log v5
+1	61	7284768516963499	CMakeFiles/main.dir/main.c.obj	c898df8dd822399c
+61	133	7284768517673477	main.exe	5b0e720f507fb5a4
+1	199	7284024619171684	LexicalParser/CMakeFiles/LexParser.dir/cli/cli.c.obj	d65da73e4eab23a9
+1	323	7286612838939366	build.ninja	77fae47085f9088d

@@ -1,0 +1,8 @@
+import people for People
+
+define test() {
+    var test = People("asxe", "19")
+    test.sayHi()
+}
+
+test()
