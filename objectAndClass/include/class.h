@@ -10,6 +10,8 @@
 #include "header_obj.h"
 #include "obj_string.h"
 #include "obj_fun.h"
+#include "obj_range.h"
+#include "obj_list.h"
 
 typedef enum {
     MT_NONE,      // 空方法类型
@@ -35,10 +37,16 @@ typedef enum {
     })
 
 #define VALUE_TO_OBJ(value) (value.objHeader)
-#define VALUE_TO_OBJSTR(value)
-#define VALUE_TO_OBJFUN(value)
-#define VALUE_TO_OBJCLOSURE(value)
-#define VALUE_TO_CLASS(value)
+#define VALUE_TO_OBJSTR(value) ((ObjString *) VALUE_TO_OBJ(value))
+#define VALUE_TO_OBJFUN(value) ((ObjFun *) VALUE_TO_OBJ(value))
+#define VALUE_TO_OBJRANGE(value) ((ObjRange *) VALUE_TO_OBJ(value))
+#define VALUE_TO_OBJINSTANCE(value) ((ObjInstance *) VALUE_TO_OBJ(value))
+#define VALUE_TO_OBJLIST(value) ((ObjList *) VALUE_TO_OBJ(value))
+#define VALUE_TO_OBJMAP(value) (())
+#define VALUE_TO_OBJCLOSURE(value) ((ObjClosure *) VALUE_TO_OBJ(value))
+#define VALUE_TO_CLASS(value) ((Class *) VALUE_TO_OBJ(value))
+#define VALUE_TO_OBJTHREAD(value) (())
+#define VALUE_TO_OBJMODULE(value) ((ObjModule *) VALUE_TO_OBJ(value))
 
 #define VALUE_IS_UNDEFINED(value) ((value).type == VT_UNDEFINED)
 #define VALUE_IS_NULL(value) ((value).type == VT_NULL)
