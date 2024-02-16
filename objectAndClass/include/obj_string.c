@@ -52,8 +52,10 @@ uint32_t mm3HashString(const char *str, uint32_t length, uint32_t seed) {
     switch (length & 3) {
         case 3:
             k1 ^= tail[2] << 16;
+            // Intentional fallthrough
         case 2:
             k1 ^= tail[1] << 8;
+            // Intentional fallthrough
         case 1:
             k1 ^= tail[0];
             k1 *= c1;
