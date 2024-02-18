@@ -108,6 +108,78 @@ static void resizeMap(VM *vm, ObjMap *objMap, uint32_t newCapacity) {
     objMap->capacity = newCapacity; //更新容量
 }
 
+//查找key对应的entry
+static Entry *findEntry(ObjMap *objMap, Value key) {
+    if (objMap->capacity == 0)
+        return NULL;
 
+    //用哈希值对容量取模计算槽位
+    uint32_t index = hashValue(key) % objMap->capacity;
+    Entry *entry;
+    while (true) {
+        entry = &objMap->entries[index];
 
+        if (valueIsEqual(entry->key, key))
+            return entry;
 
+        if (VALUE_IS_UNDEFINED(entry->key) && VALUE_IS_FALSE(entry->value))
+            return NULL;
+
+        index = (index + 1) % objMap->capacity;
+    }
+}
+
+//在map中实现键值关联，map[key] = value
+void mapSet(VM *vm, ObjMap *objMap, Value key, Value value) {
+    //容量利用率达到80%时扩容
+    if (objMap->count + 1 > objMap->capacity * MAP_LOAD_PERCENT) {
+        uint32_t newCapacity = objMap->capacity * CAPACITY_GROW_FACTOR;
+        if (newCapacity < MIN_CAPACITY)
+            newCapacity = MIN_CAPACITY;
+        resizeMap(vm, objMap, newCapacity);
+    }
+
+    //若创建了新key则count+1
+    if (addEntry(objMap->entries, objMap->capacity, key, value))
+        objMap->count++;
+}
+
+//查找键对应的值，map[key]
+Value mapGet(ObjMap *objMap, Value key) {
+    Entry *entry = findEntry(objMap, key);
+    if (entry == NULL)
+        return VT_TO_VALUE(VT_UNDEFINED);
+    return entry->value;
+}
+
+//回收map.entries
+void clearMap(VM *vm, ObjMap *objMap) {
+    DEALLOCATE_ARRAY(vm, objMap->entries, objMap->count);
+    objMap->entries = NULL;
+    objMap->capacity = objMap->count = 0;
+}
+
+//删除map中的key，并返回值
+Value removeKey(VM *vm, ObjMap *objMap, Value key) {
+    Entry *entry = findEntry(objMap, key);
+
+    if (entry == NULL)
+        return VT_TO_VALUE(VT_NULL);
+
+    //开放定址的伪删除
+    Value value = entry->value;
+    entry->key = VT_TO_VALUE(VT_UNDEFINED);
+    entry->value = VT_TO_VALUE(VT_TRUE); //值为真，伪删除
+
+    objMap->count--;
+    if (objMap->count == 0)
+        clearMap(vm, objMap);
+    else if (objMap->count < objMap->capacity / (CAPACITY_GROW_FACTOR) * MAP_LOAD_PERCENT &&
+             objMap->count > MIN_CAPACITY) {
+        uint32_t newCapacity = objMap->capacity / CAPACITY_GROW_FACTOR;
+        if (newCapacity < MIN_CAPACITY)
+            newCapacity = MIN_CAPACITY;
+        resizeMap(vm, objMap, newCapacity);
+    }
+    return value;
+}

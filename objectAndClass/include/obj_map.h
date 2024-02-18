@@ -24,7 +24,7 @@ typedef struct {
 ObjMap *newObjMap(VM *vm);
 
 void mapSet(VM *vm, ObjMap *objMap, Value key, Value value);
-void mapGet(ObjMap *objMap, Value key);
+Value mapGet(ObjMap *objMap, Value key);
 void clearMap(VM *vm, ObjMap *objMap);
 Value removeKey(VM *vm, ObjMap *objMap, Value key);
 
