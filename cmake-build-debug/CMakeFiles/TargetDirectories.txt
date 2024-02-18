@@ -1,8 +1,0 @@
-F:/WorkSpace/c-case/stove/cmake-build-debug/CMakeFiles/main.dir
-F:/WorkSpace/c-case/stove/cmake-build-debug/CMakeFiles/edit_cache.dir
-F:/WorkSpace/c-case/stove/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-F:/WorkSpace/c-case/stove/cmake-build-debug/LexicalParser/CMakeFiles/LexParser.dir
-F:/WorkSpace/c-case/stove/cmake-build-debug/LexicalParser/CMakeFiles/edit_cache.dir
-F:/WorkSpace/c-case/stove/cmake-build-debug/LexicalParser/CMakeFiles/rebuild_cache.dir
-F:/WorkSpace/c-case/stove/cmake-build-debug/objectAndClass/CMakeFiles/edit_cache.dir
-F:/WorkSpace/c-case/stove/cmake-build-debug/objectAndClass/CMakeFiles/rebuild_cache.dir
