@@ -95,4 +95,6 @@ typedef union {
 #define CAPACITY_GROW_FACTOR 4
 #define MIN_CAPACITY 64
 
+bool valueIsEqual(Value a, Value b);
+
 #endif // STOVE_CLASS_H
