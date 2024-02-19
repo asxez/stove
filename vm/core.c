@@ -9,10 +9,13 @@
 #include "core.h"
 #include <string.h>
 #include <sys/stat.h>
-#include "utils.h"
+#include "../utils/utils.h"
 #include "vm.h"
+#include "../objectAndClass/include/class.h"
 
 char *rootDir = NULL; //根目录
+
+#define CORE_MODULE VT_TO_VALUE(VT_NULL)
 
 //读取源代码文件
 char *readFile(const char *path) {
@@ -36,4 +39,16 @@ char *readFile(const char *path) {
     fileContent[fileSize] = EOS;
     fclose(file);
     return fileContent;
+}
+
+//执行模块
+VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
+    return VM_RESULT_ERROR;
+}
+
+//编译核心模块
+void buildCore(VM *vm) {
+    //创建核心模块，录入到vm->allModules
+    ObjModule *coreModule = newObjModule(vm, NULL);
+    mapSet(vm, vm->allModules, CORE_MODULE, OBJ_TO_VALUE(coreModule));
 }

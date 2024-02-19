@@ -5,7 +5,7 @@
 #ifndef STOVE_OBJ_FUN_H
 #define STOVE_OBJ_FUN_H
 
-#include "../../LexicalParser/include/utils.h"
+#include "../../utils/utils.h"
 #include "meta_obj.h"
 
 typedef struct {

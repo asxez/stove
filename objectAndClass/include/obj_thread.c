@@ -3,7 +3,7 @@
 //
 
 #include "obj_thread.h"
-#include "../../LexicalParser/include/vm.h"
+#include "../../vm/vm.h"
 #include "class.h"
 
 //为运行函数准备帧栈

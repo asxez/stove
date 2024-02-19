@@ -5,9 +5,9 @@
 #ifndef STOVE_VM_H
 #define STOVE_VM_H
 
-#include "common.h"
-#include "../../objectAndClass/include/header_obj.h"
-#include "../../objectAndClass/include/obj_map.h"
+#include "../utils/common.h"
+#include "../objectAndClass/include/header_obj.h"
+#include "../objectAndClass/include/obj_map.h"
 
 typedef enum vmResult {
     VM_RESULT_SUCCESS,

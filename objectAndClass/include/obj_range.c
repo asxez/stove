@@ -3,9 +3,9 @@
 //
 
 #include "obj_range.h"
-#include "../../LexicalParser/include/utils.h"
+#include "../../utils/utils.h"
 #include "class.h"
-#include "../../LexicalParser/include/vm.h"
+#include "../../vm/vm.h"
 
 ObjRange *newObjRange(VM *vm, int from, int to) {
     ObjRange *objRange = ALLOCATE(vm, ObjRange);

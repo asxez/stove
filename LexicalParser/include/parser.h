@@ -5,8 +5,8 @@
 #ifndef STOVE_PARSER_H
 #define STOVE_PARSER_H
 
-#include "common.h"
-#include "vm.h"
+#include "../../utils/common.h"
+#include "../../vm/vm.h"
 #include "../../objectAndClass/include/meta_obj.h"
 
 typedef enum {

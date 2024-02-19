@@ -4,9 +4,9 @@
 
 #include "obj_string.h"
 #include <string.h>
-#include "../../LexicalParser/include/vm.h"
-#include "../../LexicalParser/include/utils.h"
-#include "../../LexicalParser/include/common.h"
+#include "../../vm/vm.h"
+#include "../../utils/utils.h"
+#include "../../utils/common.h"
 #include <stdlib.h>
 
 //fnv-la算法

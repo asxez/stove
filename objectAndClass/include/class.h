@@ -5,8 +5,8 @@
 #ifndef STOVE_CLASS_H
 #define STOVE_CLASS_H
 
-#include "../../LexicalParser/include/common.h"
-#include "../../LexicalParser/include/utils.h"
+#include "../../utils/common.h"
+#include "../../utils/utils.h"
 #include "header_obj.h"
 #include "obj_string.h"
 #include "obj_fun.h"

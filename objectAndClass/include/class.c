@@ -3,11 +3,11 @@
 //
 
 #include "class.h"
-#include "../../LexicalParser/include/common.h"
+#include "../../utils/common.h"
 #include <string.h>
 #include "obj_range.h"
-#include "../../LexicalParser/include/core.h"
-#include "../../LexicalParser/include/vm.h"
+#include "../../vm/core.h"
+#include "../../vm/vm.h"
 
 DEFINE_BUFFER_METHOD(Method)
 

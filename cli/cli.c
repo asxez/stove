@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "parser.h"
-#include "vm.h"
-#include "core.h"
+#include "../vm/vm.h"
+#include "../vm/core.h"
 #include "token.list"
 
 //执行脚本文件

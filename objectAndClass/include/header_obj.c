@@ -4,7 +4,7 @@
 
 #include "header_obj.h"
 #include "class.h"
-#include "../../LexicalParser/include/vm.h"
+#include "../../vm/vm.h"
 
 DEFINE_BUFFER_METHOD(Value)
 

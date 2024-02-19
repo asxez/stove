@@ -5,7 +5,7 @@
 #ifndef STOVE_HEADER_OBJ_H
 #define STOVE_HEADER_OBJ_H
 
-#include "../../LexicalParser/include/utils.h"
+#include "../../utils/utils.h"
 
 typedef enum {
     OT_CLASS, //此项是class类型，以下都是object类型

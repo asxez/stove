@@ -4,7 +4,7 @@
 
 #include "obj_map.h"
 #include "class.h"
-#include "../../LexicalParser/include/vm.h"
+#include "../../vm/vm.h"
 #include "obj_string.h"
 #include "obj_range.h"
 

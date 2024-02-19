@@ -6,7 +6,7 @@
 #define STOVE_OBJ_LIST_H
 
 #include "class.h"
-#include "../../LexicalParser/include/vm.h"
+#include "../../vm/vm.h"
 
 typedef struct {
     ObjHeader objHeader;
