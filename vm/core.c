@@ -2,10 +2,6 @@
 // Created by asxe on 2024/1/26.
 //
 
-/*
- * 实现源码的读取
- * */
-
 #include "core.h"
 #include <string.h>
 #include <sys/stat.h>

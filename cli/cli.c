@@ -4,10 +4,11 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "parser.h"
+#include "../lexicalParser/include/parser.h"
 #include "../vm/vm.h"
 #include "../vm/core.h"
 #include "token.list"
+#include "../objectAndClass/include/class.h"
 
 //执行脚本文件
 static void runFile(const char *path) {
@@ -21,6 +22,8 @@ static void runFile(const char *path) {
 
     VM *vm = newVM();
     const char *sourceCode = readFile(path);
+
+    executeModule(vm, OBJ_TO_VALUE(newObjString(vm, path, strlen(path))), sourceCode);
 
     struct parser parser;
     initParser(vm, &parser, path, sourceCode, NULL);
