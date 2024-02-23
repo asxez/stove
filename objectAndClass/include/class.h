@@ -69,7 +69,7 @@ typedef struct {
     MethodType methodType;
     union {
         //指向脚本方法所关联的C语言实现
-        Primitive primFUN;
+        Primitive primFun;
         //指向脚本代码编译后的ObjectClosure或者ObjFun
         ObjClosure *obj;
     };
@@ -96,5 +96,7 @@ typedef union {
 #define MIN_CAPACITY 64
 
 bool valueIsEqual(Value a, Value b);
+Class *newRawClass(VM *vm, const char *name, uint32_t fieldNum);
+Class *getClassOfObj(VM *vm, Value object);
 
 #endif // STOVE_CLASS_H
