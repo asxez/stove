@@ -54,7 +54,7 @@ typedef enum {
 #define VALUE_IS_FALSE(value) ((value).type == VT_FALSE)
 #define VALUE_IS_NUM(value) ((value).type == VT_NUM)
 #define VALUE_IS_OBJ(value) ((value).type == VT_OBJ)
-#define VALUE_IS_CERTAIN_OBJ(value, objType) (VALUE_IS_OBJ(value) && VALUE_TO_OBJ(value)->type == objType)
+#define VALUE_IS_CERTAIN_OBJ(value, type) (VALUE_IS_OBJ(value) && VALUE_TO_OBJ(value)->objType == type)
 #define VALUE_IS_OBJSTR(value) (VALUE_IS_CERTAIN_OBJ(value, OT_STRING))
 #define VALUE_IS_OBJINSTANCE(value) (VALUE_IS_CERTAIN_OBJ(value, OT_INSTANCE))
 #define VALUE_IS_OBJCLOSURE(value) (VALUE_IS_CERTAIN_OBJ(value, OT_CLOSURE))

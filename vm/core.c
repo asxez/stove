@@ -48,9 +48,7 @@ char *rootDir = NULL; // 根目录
         method.type = MT_PRIMITIVE;                                                       \
         method.primFun = func;                                                            \
         bindMethod(vm, classPtr, (uint32_t) globalIdx, method);                           \
-}                                                                                                                                       \
-
-
+}
 
 // 读取源代码文件
 char *readFile(const char *path) {
@@ -61,7 +59,7 @@ char *readFile(const char *path) {
     struct stat fileStat;
     stat(path, &fileStat);
     size_t fileSize = fileStat.st_size;
-    char *fileContent = (char *)malloc(fileSize + 1);
+    char *fileContent = (char *) malloc(fileSize + 1);
     if (fileContent == NULL)
         MEM_ERROR("Couldn't allocate memory for reading file : \"%s\"", path);
 
@@ -87,3 +85,86 @@ void buildCore(VM *vm) {
     ObjModule *coreModule = newObjModule(vm, NULL);
     mapSet(vm, vm->allModules, CORE_MODULE, OBJ_TO_VALUE(coreModule));
 }
+
+// !object: object取反，结果为false
+static bool primObjectNot(VM *vm UNUSED, Value *args) {
+    RET_VALUE(VT_TO_VALUE(VT_FALSE));
+}
+
+//args[0] == args[1]: 返回object是否相等
+static bool primObjectEqual(VM *vm UNUSED, Value *args) {
+    Value boolValue = BOOL_TO_VALUE(valueIsEqual(args[0], args[1]));
+    RET_VALUE(boolValue);
+}
+
+//args[0] != args[1]: 返回object是否不等
+static bool primObjectNotEqual(VM *vm UNUSED, Value *args) {
+    Value boolValue = BOOL_TO_VALUE(!valueIsEqual(args[0], args[1]));
+    RET_VALUE(boolValue);
+}
+
+// args[0] is args[1]:类args[0]是否为类args[1]的子类
+static bool primObjectIsSonClass(VM *vm, Value *args) {
+    //args[1]必须是class
+    if (!VALUE_IS_CLASS(args[1]))
+        RUN_ERROR("argument must be class.");
+
+    Class *thisClass = getClassOfObj(vm, args[0]);
+    Class *baseClass = (Class *) (args[1].objHeader);
+
+    //有可能是多级继承，因此自下而上遍历基类链
+    while (baseClass != NULL) {
+        //在某一级基类找到匹配，就设置返回值为VT_TRUE并返回
+        if (thisClass == baseClass)
+            RET_VALUE(VT_TO_VALUE(VT_TRUE));
+        baseClass = baseClass->superClass;
+    }
+
+    //若未找到基类，说明不具备is_a关系
+    RET_VALUE(VT_TO_VALUE(VT_FALSE));
+}
+
+//args[0].toString:返回args[0]所属class的名字
+static bool primObjectToString(VM *vm UNUSED, Value *args) {
+    Class *class = args[0].objHeader->class;
+    Value nameValue = OBJ_TO_VALUE(class->name);
+    RET_VALUE(nameValue);
+}
+
+//args[0].type:返回对象args[0]的类
+static bool primObjectType(VM *vm, Value *args) {
+    Class *class = getClassOfObj(vm, args[0]);
+    RET_OBJ(class);
+}
+
+//args[0].name：返回类名
+static bool primClassName(VM *vm UNUSED, Value *args) {
+    RET_OBJ(VALUE_TO_CLASS(args[0])->name);
+}
+
+//args[0].superType:返回args[0]的基类
+static bool primClassSuperType(VM *vm UNUSED, Value *args) {
+    Class *class = VALUE_TO_CLASS(args[0]);
+    if (class->superClass != NULL)
+        RET_OBJ(class->superClass);
+    RET_VALUE(VT_TO_VALUE(VT_NULL));
+}
+
+//args[0].toString:返回类名
+static bool primClassToString(VM *vm UNUSED, Value *args) {
+    RET_OBJ(VALUE_TO_CLASS(args[0])->name);
+}
+
+//args[0].same(args[1],args[2]):返回args[1]和args[2]是否相等
+static bool primObjectMetaSame(VM *vm UNUSED, Value *args) {
+    Value boolValue = BOOL_TO_VALUE(valueIsEqual(args[1], args[2]));
+    RET_VALUE(boolValue);
+}
+
+
+
+
+
+
+
+
