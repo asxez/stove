@@ -161,6 +161,29 @@ static bool primObjectMetaSame(VM *vm UNUSED, Value *args) {
     RET_VALUE(boolValue);
 }
 
+//table中查找符号symbol，找到后返回索引，否则返回-1
+int getIndexFromSymbolTable(SymbolTable *table, const char *symbol, uint32_t length) {
+    ASSERT(length != 0, "length of symbol is 0.");
+    uint32_t index = 0;
+    while (index < table->count) {
+        if (length == table->datas[index].length && memcmp(table->datas[index].str, symbol, length) == 0)
+            return (int) index;
+        index++;
+    }
+    return -1;
+}
+
+//往table中添加符号symbol，返回其索引
+int addSymbol(VM *vm, SymbolTable *table, const char *symbol, uint32_t length) {
+    ASSERT(length != 0, "length of symbol is 0.");
+    String string;
+    string.str = ALLOCATE_ARRAY(vm, char, length + 1);
+    memcpy(string.str, symbol, length);
+    string.str[length] = EOS;
+    string.length = length;
+    StringBufferAdd(vm, table, string);
+    return (int) (table->count - 1);
+}
 
 
 
