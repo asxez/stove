@@ -8,6 +8,7 @@
 #include "../utils/utils.h"
 #include "vm.h"
 #include "../objectAndClass/include/class.h"
+#include "../compiler/compiler.h"
 
 char *rootDir = NULL; // 根目录
 
@@ -185,6 +186,36 @@ int addSymbol(VM *vm, SymbolTable *table, const char *symbol, uint32_t length) {
     return (int) (table->count - 1);
 }
 
+//定义类
+static Class *defineClass(VM *vm, ObjModule *objModule, const char *name) {
+    Class *class = newRawClass(vm, name, 0);
+    //把类作为普通变量在模块中定义
+    defineModuleVar(vm, objModule, name, strlen(name), OBJ_TO_VALUE(class));
+    return class;
+}
+
+//使class->methods[index] = method
+void bindMethod(VM *vm, Class *class, uint32_t index, Method method) {
+    if (index >= class->methods.count) {
+        Method emptyPad = {MT_NONE, {0}};
+        MethodBufferFillWrite(vm, &class->methods, emptyPad, index - class->methods.count + 1);
+    }
+    class->methods.datas[index] = method;
+}
+
+//绑定基类
+void bindSuperClass(VM *vm, Class *subClass, Class *superClass) {
+    subClass->superClass = superClass;
+
+    //继承基类属性数
+    subClass->fieldNum += superClass->fieldNum;
+    //继承基类方法
+    uint32_t idx = 0;
+    while (idx < superClass->methods.count) {
+        bindMethod(vm, subClass, idx, superClass->methods.datas[idx]);
+        idx++;
+    }
+}
 
 
 
