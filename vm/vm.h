@@ -24,6 +24,8 @@ struct vm {
     Class *boolClass;
     Class *numClass;
     Class *threadClass;
+    Class *objectClass;
+    Class *classOfClass;
     uint32_t allocatedBytes; //累计已分配的内存量
     ObjHeader *allObjects; //所有已分配对象链表
     SymbolTable allMethodNames; //所有类的方法名

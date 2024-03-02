@@ -46,7 +46,7 @@ char *rootDir = NULL; // 根目录
         if (globalIdx == -1)                                                              \
             globalIdx = addSymbol(vm, &vm->allMethodNames, methodName, length);           \
         Method method;                                                                    \
-        method.type = MT_PRIMITIVE;                                                       \
+        method.methodType = MT_PRIMITIVE;                                                 \
         method.primFun = func;                                                            \
         bindMethod(vm, classPtr, (uint32_t) globalIdx, method);                           \
 }
@@ -75,33 +75,21 @@ char *readFile(const char *path) {
     return fileContent;
 }
 
-// 执行模块
-VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
-    return VM_RESULT_ERROR;
-}
-
-// 编译核心模块
-void buildCore(VM *vm) {
-    // 创建核心模块，录入到vm->allModules
-    ObjModule *coreModule = newObjModule(vm, NULL);
-    mapSet(vm, vm->allModules, CORE_MODULE, OBJ_TO_VALUE(coreModule));
-}
-
 // !object: object取反，结果为false
 static bool primObjectNot(VM *vm UNUSED, Value *args) {
-    RET_VALUE(VT_TO_VALUE(VT_FALSE));
+    RET_VALUE(VT_TO_VALUE(VT_FALSE))
 }
 
 //args[0] == args[1]: 返回object是否相等
 static bool primObjectEqual(VM *vm UNUSED, Value *args) {
     Value boolValue = BOOL_TO_VALUE(valueIsEqual(args[0], args[1]));
-    RET_VALUE(boolValue);
+    RET_VALUE(boolValue)
 }
 
 //args[0] != args[1]: 返回object是否不等
 static bool primObjectNotEqual(VM *vm UNUSED, Value *args) {
     Value boolValue = BOOL_TO_VALUE(!valueIsEqual(args[0], args[1]));
-    RET_VALUE(boolValue);
+    RET_VALUE(boolValue)
 }
 
 // args[0] is args[1]:类args[0]是否为类args[1]的子类
@@ -122,44 +110,44 @@ static bool primObjectIsSonClass(VM *vm, Value *args) {
     }
 
     //若未找到基类，说明不具备is_a关系
-    RET_VALUE(VT_TO_VALUE(VT_FALSE));
+    RET_VALUE(VT_TO_VALUE(VT_FALSE))
 }
 
 //args[0].toString:返回args[0]所属class的名字
 static bool primObjectToString(VM *vm UNUSED, Value *args) {
     Class *class = args[0].objHeader->class;
     Value nameValue = OBJ_TO_VALUE(class->name);
-    RET_VALUE(nameValue);
+    RET_VALUE(nameValue)
 }
 
 //args[0].type:返回对象args[0]的类
 static bool primObjectType(VM *vm, Value *args) {
     Class *class = getClassOfObj(vm, args[0]);
-    RET_OBJ(class);
+    RET_OBJ(class)
 }
 
 //args[0].name：返回类名
 static bool primClassName(VM *vm UNUSED, Value *args) {
-    RET_OBJ(VALUE_TO_CLASS(args[0])->name);
+    RET_OBJ(VALUE_TO_CLASS(args[0])->name)
 }
 
 //args[0].superType:返回args[0]的基类
 static bool primClassSuperType(VM *vm UNUSED, Value *args) {
     Class *class = VALUE_TO_CLASS(args[0]);
     if (class->superClass != NULL)
-        RET_OBJ(class->superClass);
-    RET_VALUE(VT_TO_VALUE(VT_NULL));
+        RET_OBJ(class->superClass)
+    RET_VALUE(VT_TO_VALUE(VT_NULL))
 }
 
 //args[0].toString:返回类名
 static bool primClassToString(VM *vm UNUSED, Value *args) {
-    RET_OBJ(VALUE_TO_CLASS(args[0])->name);
+    RET_OBJ(VALUE_TO_CLASS(args[0])->name)
 }
 
 //args[0].same(args[1],args[2]):返回args[1]和args[2]是否相等
 static bool primObjectMetaSame(VM *vm UNUSED, Value *args) {
     Value boolValue = BOOL_TO_VALUE(valueIsEqual(args[1], args[2]));
-    RET_VALUE(boolValue);
+    RET_VALUE(boolValue)
 }
 
 //table中查找符号symbol，找到后返回索引，否则返回-1
@@ -217,8 +205,44 @@ void bindSuperClass(VM *vm, Class *subClass, Class *superClass) {
     }
 }
 
+// 执行模块
+VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
+    return VM_RESULT_ERROR;
+}
 
+// 编译核心模块
+void buildCore(VM *vm) {
+    // 创建核心模块，录入到vm->allModules
+    ObjModule *coreModule = newObjModule(vm, NULL);
+    mapSet(vm, vm->allModules, CORE_MODULE, OBJ_TO_VALUE(coreModule));
 
+    //创建object类并绑定方法
+    vm->objectClass = defineClass(vm, coreModule, "object");
+    PRIM_METHOD_BIND(vm->objectClass, "!", primObjectNot)
+    PRIM_METHOD_BIND(vm->objectClass, "==(_)", primObjectEqual)
+    PRIM_METHOD_BIND(vm->objectClass, "!=(_)", primObjectNotEqual)
+    PRIM_METHOD_BIND(vm->objectClass, "is(_)", primObjectIsSonClass)
+    PRIM_METHOD_BIND(vm->objectClass, "toString", primObjectToString)
+    PRIM_METHOD_BIND(vm->objectClass, "type", primObjectType)
 
+    //定义classOfClass类，它是所有meta类的meta类和基类
+    vm->classOfClass = defineClass(vm, coreModule, "class");
+    //objectClass是任何类的基类
+    bindSuperClass(vm, vm->classOfClass, vm->objectClass);
 
+    PRIM_METHOD_BIND(vm->classOfClass, "name", primClassName)
+    PRIM_METHOD_BIND(vm->classOfClass, "supertype", primClassSuperType)
+    PRIM_METHOD_BIND(vm->classOfClass, "toString", primClassToString)
 
+    //定义object类的元信息类objectMetaClass，它不用挂载到vm
+    Class *objectMetaClass = defineClass(vm, coreModule, "objectMeta");
+    //classOfClass类是所有meta类的meta类和基类
+    bindSuperClass(vm, objectMetaClass, vm->classOfClass);
+
+    //类型比较
+    PRIM_METHOD_BIND(objectMetaClass, "same(_,_)", primObjectMetaSame)
+    //绑定各自的meta类
+    vm->objectClass->objHeader.class = objectMetaClass;
+    objectMetaClass->objHeader.class = vm->classOfClass;
+    vm->classOfClass->objHeader.class = vm->classOfClass; //自己指向自己
+}
