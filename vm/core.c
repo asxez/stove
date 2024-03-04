@@ -9,6 +9,7 @@
 #include "vm.h"
 #include "../objectAndClass/include/class.h"
 #include "../compiler/compiler.h"
+#include "../objectAndClass/include/obj_thread.h"
 
 char *rootDir = NULL; // 根目录
 
@@ -150,6 +151,45 @@ static bool primObjectMetaSame(VM *vm UNUSED, Value *args) {
     RET_VALUE(boolValue)
 }
 
+//从modules中获取名为moduleName的模块
+static ObjModule *getModule(VM *vm, Value moduleName) {
+    Value value = mapGet(vm->allModules, moduleName);
+    if (value.type == VT_UNDEFINED)
+        return NULL;
+    return VALUE_TO_OBJMODULE(value);
+}
+
+//载入模块moduleName并编译
+static ObjThread *loadModule(VM *vm, Value moduleName, const char *moduleCode) {
+    //确保模块已经载入到vm->allModules
+    //先查看是否已经导入了该模块，避免重新导入
+    ObjModule *module = getModule(vm, moduleName);
+
+    //若该模块未加载先将其载入，并继承核心模块中的变量
+    if (module == NULL) {
+        //创建模块并添加到vm->allModules中
+        ObjString *newModuleName = VALUE_TO_OBJSTR(moduleName);
+        ASSERT(newModuleName->value.start[newModuleName->value.length] == EOS, "string.value.start is not terminated.");
+        module = newObjModule(vm, newModuleName->value.start);
+        mapSet(vm, vm->allModules, moduleName, OBJ_TO_VALUE(module));
+
+        //继承核心模块中的变量
+        ObjModule *coreModule = getModule(vm, CORE_MODULE);
+        uint32_t idx = 0;
+        while (idx < coreModule->moduleVarName.count) {
+            defineModuleVar(vm, module, coreModule->moduleVarName.datas[idx].str,
+                            strlen(coreModule->moduleVarName.datas[idx].str), coreModule->moduleVarValue.datas[idx]);
+            idx++;
+        }
+    }
+
+    ObjFun *fun = compileModule(vm, module, moduleCode);
+    ObjClosure *objClosure = newObjClosure(vm, fun);
+    ObjThread *moduleThread = newObjThread(vm, objClosure);
+
+    return moduleThread;
+}
+
 //table中查找符号symbol，找到后返回索引，否则返回-1
 int getIndexFromSymbolTable(SymbolTable *table, const char *symbol, uint32_t length) {
     ASSERT(length != 0, "length of symbol is 0.");
@@ -207,6 +247,7 @@ void bindSuperClass(VM *vm, Class *subClass, Class *superClass) {
 
 // 执行模块
 VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
+    ObjThread *objThread = loadModule(vm, moduleName, moduleCode);
     return VM_RESULT_ERROR;
 }
 
@@ -231,7 +272,7 @@ void buildCore(VM *vm) {
     bindSuperClass(vm, vm->classOfClass, vm->objectClass);
 
     PRIM_METHOD_BIND(vm->classOfClass, "name", primClassName)
-    PRIM_METHOD_BIND(vm->classOfClass, "supertype", primClassSuperType)
+    PRIM_METHOD_BIND(vm->classOfClass, "superType", primClassSuperType)
     PRIM_METHOD_BIND(vm->classOfClass, "toString", primClassToString)
 
     //定义object类的元信息类objectMetaClass，它不用挂载到vm

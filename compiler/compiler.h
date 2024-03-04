@@ -71,5 +71,6 @@ typedef struct {
 typedef struct compileUnit CompileUnit;
 
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value);
+ObjFun *compileModule(VM *vm, ObjModule *objModule, const char *moduleCode);
 
 #endif //STOVE_COMPILER_H
