@@ -27,3 +27,21 @@ UTF-8编码规则：
 - 对于单字节的符号，字节的第一位设为0，后面7位为这个字符的unicode码。
 - 对于n字节符号，第一个字节的前n位都设为1，第n+1位设为0，后面字节的前两位均为10，剩下的没有提及的二进制位则为这个字符的unicode码。
 
+## 虚拟机
+本系统采用的虚拟机是基于栈的虚拟机。基于栈的虚拟机开发简单，但是效率不如基于寄存器的虚拟机。因此我们采用减少操作码数量的方式提升效率。
+
+减少操作码：取指，译码，执行，前两个操作最为耗时，减少操作码即减少了花费在取指和译码上的时间，因此提升了效率。另外，减少操作码还大大的提高了程序的局部性，使得CPU对下一个指令可预测，也会大大提升速度，虽说总会出现预测失败从而清空流水线（流水线上进行取指，译码，执行）导致速度降低，但是这种方式带来的好处远比代价要多。
+
+## 语法分析器
+语法分析器就是把token转换成语法树。
+
+## TDOP(TopDownOperatorPrecedence) - 自上而下算符优先
+- rbp: right bind power
+- lbp: left bind power
+- nud: null denotation
+- led: left denotation
+
+expression函数是TDOP的核心，它的参数是一个右绑定权值。原理是从左到右分析表达式，并以运算符为中心的左右操作数的两两处理，判断夹在两个运算符之间的操作数属于哪个运算符。
+
+可参考文献：[Top Down Operator Precedence](https://crockford.com/javascript/tdop/tdop.html)
+[Top Down Operator Precedence](https://crockford.com/javascript/tdop/index.html)

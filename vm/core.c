@@ -106,7 +106,7 @@ static bool primObjectIsSonClass(VM *vm, Value *args) {
     while (baseClass != NULL) {
         //在某一级基类找到匹配，就设置返回值为VT_TRUE并返回
         if (thisClass == baseClass)
-            RET_VALUE(VT_TO_VALUE(VT_TRUE));
+            RET_VALUE(VT_TO_VALUE(VT_TRUE))
         baseClass = baseClass->superClass;
     }
 
