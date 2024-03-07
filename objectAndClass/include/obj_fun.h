@@ -10,7 +10,7 @@
 
 typedef struct {
     char *funName; //函数名
-    IntBuffer linNo; //行号
+    IntBuffer lineNo; //行号
 } FunDebug; //函数中的调试结构
 
 typedef struct {
