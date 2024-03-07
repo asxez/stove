@@ -10,6 +10,7 @@
 #include "../objectAndClass/include/class.h"
 #include "../compiler/compiler.h"
 #include "../objectAndClass/include/obj_thread.h"
+#include "coreScript.inc"
 
 char *rootDir = NULL; // 根目录
 
@@ -286,4 +287,7 @@ void buildCore(VM *vm) {
     vm->objectClass->objHeader.class = objectMetaClass;
     objectMetaClass->objHeader.class = vm->classOfClass;
     vm->classOfClass->objHeader.class = vm->classOfClass; //自己指向自己
+
+    //执行核心模块
+    executeModule(vm, CORE_MODULE, coreModuleCode);
 }

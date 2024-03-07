@@ -141,8 +141,36 @@ int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t len
     return symbolIndex;
 }
 
-//编译模块
-ObjFun *compileModule(VM *vm, ObjModule *objModule, const char *moduleCode) {
+//编译程序
+static void compileProgram(CompileUnit *cu) {
     ;
 }
 
+//编译模块
+ObjFun *compileModule(VM *vm, ObjModule *objModule, const char *moduleCode) {
+    //各源码模块文件需要单独的parser
+    Parser parser;
+    parser.parent = vm->curParser;
+    vm->curParser = &parser;
+
+    if (objModule->name == NULL)
+        //核心模块是coreScript.inc
+        initParser(vm, &parser, "coreScript.inc", moduleCode, objModule);
+    else
+        initParser(vm, &parser, (const char *) objModule->name->value.start, moduleCode, objModule);
+
+    CompileUnit moduleCU;
+    initCompileUnit(&parser, &moduleCU, NULL, false);
+
+    //记录现在模块变量的数量，后面检查预定义模块变量时可减少遍历
+    uint32_t moduleVarNumBefor = objModule->moduleVarValue.count;
+    //初始的parser->curToken.type为TOKEN_UNKNOW，下面使其指向第一个合法的token
+    getNextToken(&parser);
+
+    //此时compileProgram为桩函数，并不会读进token，死循环
+    while (!matchToken(&parser, TOKEN_EOF))
+        compileProgram(&moduleCU);
+
+    printf("");
+    exit(0);
+}
