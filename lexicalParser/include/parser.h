@@ -8,6 +8,7 @@
 #include "../../utils/common.h"
 #include "../../vm/vm.h"
 #include "../../objectAndClass/include/meta_obj.h"
+#include "../../compiler/compiler.h"
 
 typedef enum {
     TOKEN_UNKNOWN,
@@ -102,10 +103,14 @@ struct parser {
     Token curToken; //当前token
     Token preToken; //前一个token
     ObjModule *curModule; //当前正在编译的模块
+    CompileUnit *curCompileUnit; //当前编译单元
+    //词法分析器在任何时刻都会处于一个编译单元中，模块、方法、函数都有自己的编译单元。
+    //类没有编译单元，因为编译单元是独立的指令流单位，类是由方法组成的，方法才是指令流的单位，类中不允许定义变量，方法中才可以有变量定义，因从类只是方法的编译单元的集合。
 
     //处于内嵌表达式中时，期望的右括号数量
     //用于跟踪小括号对的嵌套
     int interpolationExpectRightParenNum;
+    struct parser *parent; //父parser
     VM *vm;
 };
 
