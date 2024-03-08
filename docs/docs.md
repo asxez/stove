@@ -38,8 +38,12 @@ UTF-8编码规则：
 ## TDOP(TopDownOperatorPrecedence) - 自上而下算符优先
 - rbp: right bind power
 - lbp: left bind power
-- nud: null denotation
-- led: left denotation
+- nud: null denotation  不吸引左边的操作数
+- led: left denotation  吸引左边的操作数
+
+用nud方法的符号：因为常量等非操作符是不关心操作数的，也就不关心左边的操作数，因此变量、字面量等和前置运算符用nud方法。
+
+用led方法的符号：中置运算符和后置运算符都关心左边的操作数，因此用led方法。
 
 expression函数是TDOP的核心，它的参数是一个右绑定权值。原理是从左到右分析表达式，并以运算符为中心的左右操作数的两两处理，判断夹在两个运算符之间的操作数属于哪个运算符。
 
