@@ -215,6 +215,14 @@ int addSymbol(VM *vm, SymbolTable *table, const char *symbol, uint32_t length) {
     return (int) (table->count - 1);
 }
 
+//确保符号已添加到符号表
+int ensureSymbolExist(VM *vm, SymbolTable *table, const char *symbol, uint32_t length) {
+    int symbolIndex = getIndexFromSymbolTable(table, symbol, length);
+    if (symbolIndex == -1)
+        return addSymbol(vm, table, symbol, length);
+    return symbolIndex;
+}
+
 //定义类
 static Class *defineClass(VM *vm, ObjModule *objModule, const char *name) {
     Class *class = newRawClass(vm, name, 0);
