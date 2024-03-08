@@ -32,6 +32,41 @@ static const int opCodeSlotsUsed[] = {
 };
 #undef OPCODE_SLOTS
 
+typedef enum {
+    BP_NONE, //无绑定能力
+    BP_LOWEST, //最低绑定能力
+    BP_ASSIGN, // =
+    BP_CONDITION, // ?:
+    BP_LOGIC_OR, // ||
+    BP_LOGIC_AND, // &&
+    BP_EQUAL, // == !=
+    BP_IS, // is
+    BP_CMP, // < > <= >=
+    BP_BIT_OR, // |
+    BP_BIT_AND, // &
+    BP_BIT_SHIFT, // >> <<
+    BP_RANGE, // ..
+    BP_TERM, // + -
+    BP_FACTOR, // * / %
+    BP_UNARY, // - ! ~
+    BP_CALL, // . () []
+    BP_HIGHEST //最高绑定能力
+} BindPower; //操作符绑定权值
+
+//指示符函数指针
+typedef void (*DenotationFun)(CompileUnit *cu, bool canAssign);
+
+//签名函数指针
+typedef void (*methodSignatureFun)(CompileUnit *cu, Signature *signature);
+
+typedef struct {
+    const char *id; //符号
+    BindPower lbp; //左绑定权值
+    DenotationFun nud; //字面量，变量，前缀运算符等不关注左操作数的Token调用的方法
+    DenotationFun led; //中缀运算符等关注左操作数的Token调用的方法
+    methodSignatureFun methodSignature; //表示本符号在类中被视为一个方法，为其生成一个方法签名
+} SymbolBindRule; //符号绑定规则
+
 //初始化CompileUnit
 static void initCompileUnit(Parser *parser, CompileUnit *cu, CompileUnit *enclosingUnit, bool isMethod) {
     parser->curCompileUnit = cu;
@@ -112,6 +147,50 @@ static void writeOpCodeShortOperand(CompileUnit *cu, OpCode opCode, int operand)
     writeOpCode(cu, opCode);
     writeShortOperand(cu, operand);
 }
+
+//添加常量并返回其索引
+static uint32_t addConstant(CompileUnit *cu, Value constant) {
+    ValueBufferAdd(cu->curParser->vm, &cu->fun->constants, constant);
+    return cu->fun->constants.count - 1;
+}
+
+//生成加载常量的指令
+static void emitLoadConstant(CompileUnit *cu, Value value) {
+    int index = addConstant(cu, value);
+    writeOpCodeShortOperand(cu, OPCODE_LOAD_CONSTANT, index);
+}
+
+//数字和字符串.nud() 编译字面量
+static void literal(CompileUnit *cu, bool canAssign UNUSED) {
+    //literal是常量（数字和字符串）的nud方法，用来返回字面值
+    emitLoadConstant(cu, cu->curParser->preToken.value);
+}
+
+//不关注左操作数的符号称为前缀符号
+//用于如字面量、变量名、前缀符号等非运算符
+#define PREFIX_SYMBOL(nud) {NULL, BP_NONE, nud, NULL, NULL}
+
+//前缀运算符，如!
+#define PREFIX_OPERATOR(id) {id, BP_NONE, unaryOperator, NULL, unaryMethodSignature}
+
+//关注左操作数的符号为中缀符号
+//数组[，函数(，实例与方法之间的.等
+#define INFIX_SYMBOL(lbp, led) {NULL, lbp, NULL, led, NULL}
+
+//中缀运算符
+#define INFIX_OPERATOR(id, lbp) {id, lbp, NULL, infixOperator, infixMethodSignature}
+
+//既可做前缀又可以做中缀的运算符，例如-
+#define MIX_OPERATOR(id) {id, BP_TERM, unaryOperator, infixOperator, mixMethodSignature}
+
+//占位符
+#define UNUSED_RULE {NULL, BP_NONE, NULL, NULL, NULL}
+
+SymbolBindRule Rules[] = {
+        UNUSED_RULE, //TOKEN_INVALID
+        PREFIX_SYMBOL(literal), //TOKEN_NUM
+        PREFIX_SYMBOL(literal), //TOKEN_STRING
+};
 
 //在模块objModule中定义名为name，值为value的模块变量
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
