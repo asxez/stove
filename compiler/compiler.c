@@ -338,6 +338,88 @@ static void unaryOperator(CompileUnit *cu, bool canAssign UNUSED) {
     emitCall(cu, 0, rule->id, 1);
 }
 
+//添加局部变量到cu
+static uint32_t addLocalVar(CompileUnit *cu, const char *name, uint32_t length) {
+    LocalVar *var = &(cu->localVars[cu->localVarNum]);
+    var->name = name;
+    var->length = length;
+    var->scopeDepth = cu->scopeDepth;
+    var->isUpvalue = false;
+    return cu->localVarNum++;
+}
+
+//声明局部变量
+static int declareLocalVar(CompileUnit *cu, const char *name, uint32_t length) {
+    if (cu->localVarNum >= MAX_LOCAL_VAR_NUM)
+        COMPILE_ERROR(cu->curParser, "the max length of local variable of one scope %d", MAX_LOCAL_VAR_NUM);
+    //判断当前作用域中该变量是否已存在
+    int idx = (int) cu->localVarNum - 1;
+    while (idx >= 0) {
+        LocalVar *var = &cu->localVars[idx];
+        //只在当前作用域中查找同名变量，如果找到了父作用域就退出，减少没必要的遍历
+        if (var->scopeDepth < cu->scopeDepth)
+            break;
+        if (var->length == length && memcmp(var->name, name, length) == 0) {
+            char id[MAX_ID_LEN] = {EOS};
+            memcpy(id, name, length);
+            COMPILE_ERROR(cu->curParser, "identifier \"%s\" redefinition.", id);
+        }
+        idx--;
+    }
+    //检查过后声明该局部变量
+    return (int) addLocalVar(cu, name, length);
+}
+
+//根据作用域声明变量
+static int declareVariable(CompileUnit *cu, const char *name, uint32_t length) {
+    //若当前是模块作用域就声明为模块变量
+    if (cu->scopeDepth == -1) {
+        int index = defineModuleVar(cu->curParser->vm, cu->curParser->curModule, name, length, VT_TO_VALUE(VT_NULL));
+        if (index == -1) { //重复定义报错
+            char id[MAX_ID_LEN] = {EOS};
+            memcpy(id, name, length);
+            COMPILE_ERROR(cu->curParser, "identifier \"%s\" redefinition.", id);
+        }
+        return index;
+    }
+    //否则是局部作用域，声明局部变量
+    return declareLocalVar(cu, name, length);
+}
+
+//为单运算符方法创建签名
+static void unaryMethodSignature(CompileUnit *cu UNUSED, Signature *signature UNUSED) {
+    //名称部分在调用前已经完成，只修改类型
+    signature->signatureType = SIGN_GETTER;
+}
+
+//为中缀运算符创建签名
+static void infixMethodSignature(CompileUnit *cu, Signature *signature) {
+    //在类中的运算符都是方法，类型为SIGN_METHOD
+    signature->signatureType = SIGN_METHOD;
+
+    //中缀运算符只有一个参数，故初始为1
+    signature->argNum = 1;
+    consumeCurToken(cu->curParser, TOKEN_LEFT_PAREN, "expect '(' after infix operator.");
+    consumeCurToken(cu->curParser, TOKEN_ID, "expect variable name.");
+    declareVariable(cu, cu->curParser->preToken.start, cu->curParser->preToken.length);
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after parameter.");
+}
+
+//为既做单运算符又做中缀运算符的符号方法创建签名
+static void mixMethodSignature(CompileUnit *cu, Signature *signature) {
+    //假设是单运算符方法，因此默认为getter
+    signature->signatureType = SIGN_GETTER;
+
+    //若后面有'('，说明其为中缀运算符，那就置其类型为SIGN_METHOD
+    if (matchToken(cu->curParser, TOKEN_LEFT_PAREN)) {
+        signature->signatureType = SIGN_METHOD;
+        signature->argNum = 1;
+        consumeCurToken(cu->curParser, TOKEN_ID, "expect variable name.");
+        declareVariable(cu, cu->curParser->preToken.start, cu->curParser->preToken.length);
+        consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after parameter.");
+    }
+}
+
 //在模块objModule中定义名为name，值为value的模块变量
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
     if (length > MAX_ID_LEN) {
