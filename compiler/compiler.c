@@ -53,6 +53,18 @@ typedef enum {
     BP_HIGHEST //最高绑定能力
 } BindPower; //操作符绑定权值
 
+typedef enum {
+    VAR_SCOPE_INVALID,
+    VAR_SCOPE_LOCAL, //局部变量
+    VAR_SCOPE_UPVALUE, //upvalue
+    VAR_SCOPE_MODULE //模块变量
+} VarScopeType; //标识变量作用域
+
+typedef struct {
+    VarScopeType scopeType; //变量的作用域
+    int index;
+} Variable;
+
 //指示符函数指针
 typedef void (*DenotationFun)(CompileUnit *cu, bool canAssign);
 
@@ -60,6 +72,10 @@ typedef void (*DenotationFun)(CompileUnit *cu, bool canAssign);
 typedef void (*methodSignatureFun)(CompileUnit *cu, Signature *signature);
 
 static uint32_t addConstant(CompileUnit *cu, Value constant);
+
+static void expression(CompileUnit *cu, BindPower rbp);
+
+static void compileProgram(CompileUnit *cu);
 
 typedef struct {
     const char *id; //符号
@@ -384,6 +400,107 @@ static int declareVariable(CompileUnit *cu, const char *name, uint32_t length) {
     }
     //否则是局部作用域，声明局部变量
     return declareLocalVar(cu, name, length);
+}
+
+//声明模块变量，与defineModuleVar的区别是不做重定义检查，默认为声明
+static int declareModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
+    ValueBufferAdd(vm, &objModule->moduleVarValue, value);
+    return addSymbol(vm, &objModule->moduleVarName, name, length);
+}
+
+//返回包含cu->enclosingClassBK的最近CompileUnit
+static CompileUnit *getEnclosingClassBKUnit(CompileUnit *cu) {
+    while (cu != NULL) {
+        if (cu->enclosingClassBK != NULL)
+            return cu;
+        cu = cu->enclosingUnit;
+    }
+    return NULL;
+}
+
+//返回包含cu最近的ClassBookKeep
+static ClassBookKeep *getEnclosingClassBK(CompileUnit *cu) {
+    CompileUnit *newCU = getEnclosingClassBKUnit(cu);
+    if (newCU != NULL)
+        return newCU->enclosingClassBK;
+    return NULL;
+}
+
+//为实参列表中的各个实参生成加载实参的指令
+static void processArgList(CompileUnit *cu, Signature *signature) {
+    //由主调方保证参数不空
+    ASSERT(cu->curParser->curToken.tokenType != TOKEN_RIGHT_PAREN &&
+           cu->curParser->curToken.tokenType != TOKEN_RIGHT_BRACKET, "empty argument list.");
+    do {
+        if (++signature->argNum > MAX_ARG_NUM)
+            COMPILE_ERROR(cu->curParser, "the max number of argument is %d.", MAX_ARG_NUM);
+        expression(cu, BP_LOWEST);
+    } while (matchToken(cu->curParser, TOKEN_COMMA));
+}
+
+//声明形参列表中的各个形参
+static void processParaList(CompileUnit *cu, Signature *signature) {
+    ASSERT(cu->curParser->curToken.tokenType != TOKEN_RIGHT_PAREN &&
+           cu->curParser->curToken.tokenType != TOKEN_RIGHT_BRACKET, "empty argument list.");
+    do {
+        if (++signature->argNum > MAX_ARG_NUM)
+            COMPILE_ERROR(cu->curParser, "the max number of argument is %d.", MAX_ARG_NUM);
+        consumeCurToken(cu->curParser, TOKEN_ID, "expect variable name.");
+        declareVariable(cu, cu->curParser->preToken.start, cu->curParser->preToken.length);
+    } while (matchToken(cu->curParser, TOKEN_COMMA));
+}
+
+//尝试编译setter
+static bool trySetter(CompileUnit *cu, Signature *signature) {
+    if (!matchToken(cu->curParser, TOKEN_ASSIGN))
+        return false;
+    if (signature->signatureType == SIGN_SUBSCRIPT)
+        signature->signatureType = SIGN_SUBSCRIPT_SETTER;
+    else
+        signature->signatureType = SIGN_SETTER;
+
+    //读取等号右边的形参左边的(
+    consumeCurToken(cu->curParser, TOKEN_LEFT_PAREN, "expect '(' after '='.");
+    //读取形参
+    consumeCurToken(cu->curParser, TOKEN_ID, "expect ID.");
+    //声明形参
+    declareVariable(cu, cu->curParser->preToken.start, cu->curParser->preToken.length);
+    //读取等号右边的形参右边的(
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after argument list.");
+    signature->argNum++;
+    return true;
+}
+
+//标识符的签名函数
+static void idMethodSignature(CompileUnit *cu, Signature *signature) {
+    signature->signatureType = SIGN_GETTER; //刚识别到id，默认为getter
+    //new方法为构造函数
+    if (signature->length == 3 && memcmp(signature->name, "new", 3) == 0) {
+        //构造函数后面不能接=，即不能成为setter
+        if (matchToken(cu->curParser, TOKEN_ASSIGN))
+            COMPILE_ERROR(cu->curParser, "constructor shouldn't be setter.");
+        //构造函数必须是标准的method，即new(_,...)，new后面必须接(
+        if (!matchToken(cu->curParser, TOKEN_LEFT_PAREN))
+            COMPILE_ERROR(cu->curParser, "constructor must be method.");
+        signature->signatureType = SIGN_CONSTRUCT;
+        //无参数就直接返回
+        if (matchToken(cu->curParser, TOKEN_RIGHT_PAREN))
+            return;
+    } else { //若非构造函数
+        if (trySetter(cu, signature)) //若是setter，此时已经将signatureType改为了setter，直接返回
+            return;
+        if (!matchToken(cu->curParser, TOKEN_LEFT_PAREN))
+            //若后面没有(说明是getter，已在开头置为getter，直接返回
+            return;
+        //至此signatureType应该为一般形式的SIGN_METHOD，形式为name(paraList)
+        signature->signatureType = SIGN_METHOD;
+        //直接匹配到)，说明形参为空
+        if (matchToken(cu->curParser, TOKEN_RIGHT_PAREN))
+            return;
+    }
+    //处理形参
+    processArgList(cu, signature);
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after parameter list.");
 }
 
 //为单运算符方法创建签名
