@@ -603,6 +603,55 @@ static Variable getVarFromLocalOrUpvalue(CompileUnit *cu, const char *name, uint
     return var;
 }
 
+//生成把变量var加载到栈的指令
+static void emitLoadVariable(CompileUnit *cu, Variable var) {
+    switch (var.scopeType) {
+        case VAR_SCOPE_LOCAL:
+            //生成加载局部变量入栈的指令
+            writeOpCodeByteOperand(cu, OPCODE_LOAD_LOCAL_VAR, var.index);
+            break;
+        case VAR_SCOPE_UPVALUE:
+            //生成加载upvalue到栈的指令
+            writeOpCodeByteOperand(cu, OPCODE_LOAD_UPVALUE, var.index);
+            break;
+        case VAR_SCOPE_MODULE:
+            //生成加载到模块变量到栈的指令
+            writeOpCodeShortOperand(cu, OPCODE_LOAD_MODULE_VAR, var.index);
+            break;
+        default:
+            NOT_REACHED();
+    }
+}
+
+//为变量var生成存储的指令
+static void emitStoreVariable(CompileUnit *cu, Variable var) {
+    switch (var.scopeType) {
+        case VAR_SCOPE_LOCAL:
+            //生成存储到局部变量的指令
+            writeOpCodeByteOperand(cu, OPCODE_STORE_LOCAL_VAR, var.index);
+            break;
+        case VAR_SCOPE_UPVALUE:
+            //生成存储到upvalue的指令
+            writeOpCodeByteOperand(cu, OPCODE_STORE_UPVALUE, var.index);
+            break;
+        case VAR_SCOPE_MODULE:
+            //生成存储模块变量的指令
+            writeOpCodeShortOperand(cu, OPCODE_STORE_MODULE_VAR, var.index);
+            break;
+        default:
+            NOT_REACHED();
+    }
+}
+
+//生成加载或存储变量的指令
+static void emitLoadOrStoreVariable(CompileUnit *cu, bool canAssign, Variable var) {
+    if (canAssign && matchToken(cu->curParser, TOKEN_ASSIGN)) {
+        expression(cu, BP_LOWEST); //计算=右边表达式的值
+        emitStoreVariable(cu, var); //为var生成赋值指令
+    } else
+        emitLoadVariable(cu, var); //生成加载指令
+}
+
 //在模块objModule中定义名为name，值为value的模块变量
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
     if (length > MAX_ID_LEN) {
