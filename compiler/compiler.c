@@ -537,6 +537,72 @@ static void mixMethodSignature(CompileUnit *cu, Signature *signature) {
     }
 }
 
+//查找局部变量并返回索引
+static int findLocal(CompileUnit *cu, const char *name, uint32_t length) {
+    //内部作用域变量会覆外层，故从后往前，由最内层逐渐往外层找
+    int index = cu->localVarNum - 1;
+    while (index >= 0) {
+        if (cu->localVars[index].length == length && memcmp(cu->localVars[index].name, name, length) == 0)
+            return index;
+        index--;
+    }
+    return -1;
+}
+
+//添加upvalue到cu->upvalues，返回其索引，若已经存在则只返回索引
+static int addUpvalue(CompileUnit *cu, bool isEnclosingLocalVar, uint32_t index) {
+    uint32_t idx = 0;
+    while (idx < cu->fun->upvalueNum) {
+        //如果该upvalue已经添加过了就返回其索引
+        if (cu->upvalues[idx].index == index && cu->upvalues[idx].isEnclosingLocalVar == isEnclosingLocalVar)
+            return (int) idx;
+        idx++;
+    }
+    //若没有找到则将其添加
+    cu->upvalues[cu->fun->upvalueNum].isEnclosingLocalVar = isEnclosingLocalVar;
+    cu->upvalues[cu->fun->upvalueNum].index = index;
+    return (int) cu->fun->upvalueNum++;
+}
+
+//查找name指代的upvalue后添加到cu->upvalues，返回其索引，否则返回-1
+static int findUpvalue(CompileUnit *cu, const char *name, uint32_t length) {
+    if (cu->enclosingUnit == NULL) //如果已经到了最外层仍未找到，返回-1
+        return -1;
+    //进入了方法的cu并且查找的不是静态域，即不是方法的Upvalue，那就没必要再往上找了
+    if (!strchr(name, ' ') && cu->enclosingUnit->enclosingClassBK != NULL)
+        return -1;
+    //查看name是否为直接外层的局部变量
+    int directOuterLocalIndex = findLocal(cu->enclosingUnit, name, length);
+
+    //若是，将该外层局部变量置为upvalue
+    if (directOuterLocalIndex != -1) {
+        cu->enclosingUnit->localVars[directOuterLocalIndex].isUpvalue = true;
+        return addUpvalue(cu, true, (uint32_t) directOuterLocalIndex);
+    }
+    //向外层递归查找
+    int directOuterUpvalueIndex = findUpvalue(cu->enclosingUnit, name, length);
+    if (directOuterUpvalueIndex != -1)
+        return addUpvalue(cu, false, (uint32_t) directOuterUpvalueIndex);
+    //执行到此说明没有该upvalue对应的局部变量，返回-1
+    return -1;
+}
+
+//从局部变量和upvalue中查找符号name
+static Variable getVarFromLocalOrUpvalue(CompileUnit *cu, const char *name, uint32_t length) {
+    Variable var;
+    //默认为无效作用域类型，查找到后会被更正
+    var.scopeType = VAR_SCOPE_INVALID;
+    var.index = findLocal(cu, name, length);
+    if (var.index != -1) {
+        var.scopeType = VAR_SCOPE_LOCAL;
+        return var;
+    }
+    var.index = findUpvalue(cu, name, length);
+    if (var.index != -1)
+        var.scopeType = VAR_SCOPE_UPVALUE;
+    return var;
+}
+
 //在模块objModule中定义名为name，值为value的模块变量
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
     if (length > MAX_ID_LEN) {
