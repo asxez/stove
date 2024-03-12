@@ -619,7 +619,7 @@ static void emitLoadVariable(CompileUnit *cu, Variable var) {
             writeOpCodeShortOperand(cu, OPCODE_LOAD_MODULE_VAR, var.index);
             break;
         default:
-            NOT_REACHED();
+            NOT_REACHED()
     }
 }
 
@@ -639,7 +639,7 @@ static void emitStoreVariable(CompileUnit *cu, Variable var) {
             writeOpCodeShortOperand(cu, OPCODE_STORE_MODULE_VAR, var.index);
             break;
         default:
-            NOT_REACHED();
+            NOT_REACHED()
     }
 }
 
@@ -699,6 +699,7 @@ static ObjFun *endCompileUnit(CompileUnit *cu) {
         uint32_t index = addConstant(cu->enclosingUnit, OBJ_TO_VALUE(cu->fun));
         //内层函数以闭包形式在外层函数中存在，在外层函数的指令流中添加“为当前内层函数创建闭包的指令”
         writeOpCodeShortOperand(cu->enclosingUnit, OPCODE_CREATE_CLOSURE, index);
+
         //为vm在创建闭包时判断引用的是局部变量还是upvalue，下面为每个upvalue生成参数
         index = 0;
         while (index < cu->fun->upvalueNum) {
@@ -711,6 +712,83 @@ static ObjFun *endCompileUnit(CompileUnit *cu) {
     // /下面本编译单元，使当前编译单元指向外层编译单元
     cu->curParser->curCompileUnit = cu->enclosingUnit;
     return cu->fun;
+}
+
+//生成getter或者一般method调用指令
+static void emitGetterMethodCall(CompileUnit *cu, Signature *signature, OpCode opCode) {
+    Signature newSign;
+    newSign.signatureType = SIGN_GETTER; //默认为getter，假设下面的两个if不执行
+    newSign.name = signature->name;
+    newSign.length = signature->length;
+    newSign.argNum = 0;
+
+    //如果是method，有可能有参数列表，在生成调用方法的指令前必须把参数入栈，否则运行方法时除了会获取到错误的参数（即栈中已有数据）外，gc还会在从方法返回时，错误的回收参数空间而导致失衡
+    //下面调用的processArgList是把实参入栈，供方法使用
+    if (matchToken(cu->curParser, TOKEN_LEFT_PAREN)) {
+        newSign.signatureType = SIGN_METHOD;
+
+        //若后面不是)，说明有参数列表
+        if (!matchToken(cu->curParser, TOKEN_RIGHT_PAREN)) {
+            processArgList(cu, &newSign);
+            consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after argument list.");
+        }
+    }
+
+    //对method来说可能还传入了块参数
+    if (matchToken(cu->curParser, TOKEN_LEFT_BRACE)) {
+        newSign.argNum++;
+        //进入本if时，上面的if块未必执行过，此时newSign.signatureType也许还是GETTER，下面要将其设置为METHOD
+        newSign.signatureType = SIGN_METHOD;
+        CompileUnit funCU;
+        initCompileUnit(cu->curParser, &funCU, cu, false);
+
+        Signature tmpFunSign = {SIGN_METHOD, "", 0, 0}; //临时用于编译函数
+        if (matchToken(cu->curParser, TOKEN_BIT_OR)) { //若块参数也有参数
+            processParaList(&funCU, &tmpFunSign); //将形参声明为函数的局部变量
+            consumeCurToken(cu->curParser, TOKEN_BIT_OR, "expect '|' after argument list.");
+        }
+        funCU.fun->argNum = tmpFunSign.argNum;
+
+        //编译函数体，将指令流写进该函数自己的指令单元funCU
+        compileBody(&funCU, false);
+
+#if DEBUG
+        //以此函数被传给的方法来命名这个函数，函数名=方法名+" block arg"
+        char funName[MAX_SIGN_LEN + 10] = {EOS};
+        uint32_t len = signToString(&newSign, funName);
+        memmove(funName + len, " block arg", 10);
+        endCompileUnit(&funCU, funName, len + 10);
+#else
+        endCompileUnit(&funCU);
+#endif
+    }
+    //如果是在构造函数中调用了super则会执行到此，构造函数中调用的方法只能是super
+    if (signature->signatureType == SIGN_CONSTRUCT) {
+        if (newSign.signatureType != SIGN_METHOD)
+            COMPILE_ERROR(cu->curParser, "the form of supercall is super() or super(arguments).");
+        newSign.signatureType = SIGN_CONSTRUCT;
+    }
+    //根据签名生成调用指令，如果上面的三个if都未执行，此处就是getter调用
+    emitCallBySignature(cu, &newSign, opCode);
+}
+
+//生成方法调用指令，包括getter和setter
+static void emitMethodCall(CompileUnit *cu, const char *name, uint32_t length, OpCode opCode, bool canAssign) {
+    Signature signature;
+    signature.signatureType = SIGN_GETTER;
+    signature.name = name;
+    signature.length = length;
+
+    //若是setter则生成调用setter的指令
+    if (matchToken(cu->curParser, TOKEN_ASSIGN) && canAssign) {
+        signature.signatureType = SIGN_SETTER;
+        signature.argNum = 1; //setter只接受一个参数
+
+        //载入实参（即=右边所赋的值），为下面方法调用传参
+        expression(cu, BP_LOWEST);
+        emitCallBySignature(cu, &signature, opCode);
+    } else
+        emitGetterMethodCall(cu, &signature, opCode);
 }
 
 //在模块objModule中定义名为name，值为value的模块变量
