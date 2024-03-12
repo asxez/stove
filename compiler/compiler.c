@@ -652,6 +652,67 @@ static void emitLoadOrStoreVariable(CompileUnit *cu, bool canAssign, Variable va
         emitLoadVariable(cu, var); //生成加载指令
 }
 
+//生成把实例对象self加载到栈的指令
+static void emitLoadSelf(CompileUnit *cu) {
+    Variable var = getVarFromLocalOrUpvalue(cu, "self", 4);
+    ASSERT(var.scopeType != VAR_SCOPE_INVALID, "get variable failed.");
+    emitLoadVariable(cu, var);
+}
+
+//编译代码块
+static void compileBlock(CompileUnit *cu) {
+    //进入本函数前已经读入了{
+    while (!matchToken(cu->curParser, TOKEN_RIGHT_BRACE)) {
+        if (PEEK_TOKEN(cu->curParser) == TOKEN_EOF)
+            COMPILE_ERROR(cu->curParser, "expect ')' at the end of block.");
+        compileProgram(cu);
+    }
+}
+
+//编译函数或者方法体
+static void compileBody(CompileUnit *cu, bool isConstruct) {
+    //进入本函数前已经读入了{
+    compileBlock(cu);
+    if (isConstruct)
+        //若是构造函数就加载“self对象”作为下面OPCODE_RETURN的返回值
+        writeOpCodeByteOperand(cu, OPCODE_LOAD_LOCAL_VAR, 0);
+    else
+        //否则加载null占位
+        writeOpCode(cu, OPCODE_PUSH_NULL);
+    //返回编译结果，若是构造函数就返回self，否则返回null
+    writeOpCode(cu, OPCODE_RETURN);
+}
+
+//结束cu的编译工作，在其外层编译单元中为其创建闭包
+#if DEBUG
+static ObjFun *endCompileUnit(CompileUnit *cu, const char *debugName, uint32_t debugNameLen) {
+    bindDebugFunName(cu->curParser->vm, cu->fun->debug, debugName, debugNameLen);
+}
+#else
+
+static ObjFun *endCompileUnit(CompileUnit *cu) {
+#endif
+    //标识单元编译结束
+    writeOpCode(cu, OPCODE_END);
+    if (cu->enclosingUnit != NULL) {
+        //把当前编译的objFun作为常量添加到父编译单元的常量表
+        uint32_t index = addConstant(cu->enclosingUnit, OBJ_TO_VALUE(cu->fun));
+        //内层函数以闭包形式在外层函数中存在，在外层函数的指令流中添加“为当前内层函数创建闭包的指令”
+        writeOpCodeShortOperand(cu->enclosingUnit, OPCODE_CREATE_CLOSURE, index);
+        //为vm在创建闭包时判断引用的是局部变量还是upvalue，下面为每个upvalue生成参数
+        index = 0;
+        while (index < cu->fun->upvalueNum) {
+            writeByte(cu->enclosingUnit, cu->upvalues[index].isEnclosingLocalVar ? 1 : 0);
+            writeByte(cu->enclosingUnit, cu->upvalues[index].index);
+            index++;
+        }
+    }
+
+    // /下面本编译单元，使当前编译单元指向外层编译单元
+    cu->curParser->curCompileUnit = cu->enclosingUnit;
+    return cu->fun;
+}
+
 //在模块objModule中定义名为name，值为value的模块变量
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
     if (length > MAX_ID_LEN) {
