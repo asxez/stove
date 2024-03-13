@@ -768,6 +768,18 @@ static void stringInterpolation(CompileUnit *cu, bool canAssign UNUSED) {
     emitCall(cu, 0, "join()", 6);
 }
 
+//编译bool
+static void boolean(CompileUnit *cu, bool canAssign UNUSED) {
+    //true和false的nud方法
+    OpCode opCode = cu->curParser->preToken.tokenType == TOKEN_TRUE ? OPCODE_PUSH_TRUE : OPCODE_PUSH_FALSE;
+    writeOpCode(cu, opCode);
+}
+
+//生成OPCODE_PUSH_NULL指令
+static void null(CompileUnit *cu, bool canAssign UNUSED) {
+    writeOpCode(cu, OPCODE_PUSH_NULL);
+}
+
 //小写字符开头便是局部变量
 static bool isLocalName(const char *name) {
     return (bool) (name[0] >= 'a' && name[0] <= 'z');
@@ -925,6 +937,19 @@ SymbolBindRule Rules[] = {
         PREFIX_SYMBOL(literal), //TOKEN_STRING
         {NULL, BP_LOWEST, id, NULL, idMethodSignature}, //TOKEN_ID
         PREFIX_SYMBOL(stringInterpolation), //TOKEN_INTERPOLATION
+        UNUSED_RULE, //TOKEN_VAR
+        UNUSED_RULE, //TOKEN_FUN
+        UNUSED_RULE, //TOKEN_IF
+        UNUSED_RULE, //TOKEN_ELSE
+        PREFIX_SYMBOL(boolean), //TOKEN_TRUE
+        PREFIX_SYMBOL(boolean), //TOKEN_FALSE
+        UNUSED_RULE, //TOKEN_WHILE
+        UNUSED_RULE, //TOKEN_FOR
+        UNUSED_RULE, //TOKEN_BREAK
+        UNUSED_RULE, //TOKEN_CONTINUE
+        UNUSED_RULE, //TOKEN_RETURN
+        PREFIX_SYMBOL(null), //TOKEN_NULL
+        UNUSED_RULE, //TOKEN_CLASS
 };
 
 //语法分析核心
