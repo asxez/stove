@@ -77,6 +77,8 @@ static void expression(CompileUnit *cu, BindPower rbp);
 
 static void compileProgram(CompileUnit *cu);
 
+static void infixOperator(CompileUnit *cu, bool canAssign UNUSED);
+
 typedef struct {
     const char *id; //符号
     BindPower lbp; //左绑定权值
@@ -780,6 +782,31 @@ static void null(CompileUnit *cu, bool canAssign UNUSED) {
     writeOpCode(cu, OPCODE_PUSH_NULL);
 }
 
+//"self".nud()
+static void self(CompileUnit *cu, bool canAssign UNUSED) {
+    if (getEnclosingClassBK(cu) == NULL)
+        COMPILE_ERROR(cu->curParser, "self must be inside a class method.");
+    emitLoadSelf(cu);
+}
+
+//"super".nud()
+static void super(CompileUnit *cu, bool canAssign) {
+    ClassBookKeep *enclosingClassBK = getEnclosingClassBK(cu);
+    if (enclosingClassBK == NULL)
+        COMPILE_ERROR(cu->curParser, "can't invoke super outside a class method.");
+
+    //此处加载self，是保证参数args[0]始终是self对象，尽管对基类调用无用
+    emitLoadSelf(cu);
+
+    //判断形式super.methodname()
+    if (matchToken(cu->curParser, TOKEN_DOT)) {
+        consumeCurToken(cu->curParser, TOKEN_ID, "expect name after '.'");
+        emitMethodCall(cu, cu->curParser->preToken.start, cu->curParser->preToken.length, OPCODE_SUPER0, canAssign);
+    } else
+        //super()：调用基类中与关键字super所在子类方法同名的方法
+        emitGetterMethodCall(cu, enclosingClassBK->signature, OPCODE_SUPER0);
+}
+
 //小写字符开头便是局部变量
 static bool isLocalName(const char *name) {
     return (bool) (name[0] >= 'a' && name[0] <= 'z');
@@ -950,6 +977,10 @@ SymbolBindRule Rules[] = {
         UNUSED_RULE, //TOKEN_RETURN
         PREFIX_SYMBOL(null), //TOKEN_NULL
         UNUSED_RULE, //TOKEN_CLASS
+        PREFIX_SYMBOL(self), //TOKEN_SELF
+        UNUSED_RULE, //TOKEN_STATIC
+        INFIX_OPERATOR("is", BP_IS), //TOKEN_IS
+        PREFIX_SYMBOL(super), //TOKEN_SUPER
 };
 
 //语法分析核心
