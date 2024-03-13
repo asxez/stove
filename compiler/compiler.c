@@ -265,51 +265,6 @@ static void literal(CompileUnit *cu, bool canAssign UNUSED) {
     emitLoadConstant(cu, cu->curParser->preToken.value);
 }
 
-//不关注左操作数的符号称为前缀符号
-//用于如字面量、变量名、前缀符号等非运算符
-#define PREFIX_SYMBOL(nud) {NULL, BP_NONE, nud, NULL, NULL}
-
-//前缀运算符，如!
-#define PREFIX_OPERATOR(id) {id, BP_NONE, unaryOperator, NULL, unaryMethodSignature}
-
-//关注左操作数的符号为中缀符号
-//数组[，函数(，实例与方法之间的.等
-#define INFIX_SYMBOL(lbp, led) {NULL, lbp, NULL, led, NULL}
-
-//中缀运算符
-#define INFIX_OPERATOR(id, lbp) {id, lbp, NULL, infixOperator, infixMethodSignature}
-
-//既可做前缀又可以做中缀的运算符，例如-
-#define MIX_OPERATOR(id) {id, BP_TERM, unaryOperator, infixOperator, mixMethodSignature}
-
-//占位符
-#define UNUSED_RULE {NULL, BP_NONE, NULL, NULL, NULL}
-
-SymbolBindRule Rules[] = {
-        UNUSED_RULE, //TOKEN_INVALID
-        PREFIX_SYMBOL(literal), //TOKEN_NUM
-        PREFIX_SYMBOL(literal), //TOKEN_STRING
-};
-
-//语法分析核心
-static void expression(CompileUnit *cu, BindPower rbp) {
-    //以中缀运算符表达式aSwTe为例，大写字符表示运算符，小写表示操作数
-    //进入expression时，curToken为操作数w，preToken是运算符S
-    DenotationFun nud = Rules[cu->curParser->curToken.tokenType].nud;
-
-    //表达式开头的要么是操作数要么是前缀运算符，必然有nud方法
-    ASSERT(nud != NULL, "nud is NULL.");
-    getNextToken(cu->curParser); //执行后curToken为运算符T
-    bool canAssign = rbp < BP_ASSIGN;
-    nud(cu, canAssign); //计算操作数w的值
-
-    while (rbp < Rules[cu->curParser->curToken.tokenType].lbp) {
-        DenotationFun led = Rules[cu->curParser->curToken.tokenType].led;
-        getNextToken(cu->curParser); //执行后curToken为e
-        led(cu, canAssign); //计算运算符T.led方法
-    }
-}
-
 //通过签名编译方法调用，包括callX和superX指令
 static void emitCallBySignature(CompileUnit *cu, Signature *signature, OpCode opCode) {
     char signBuffer[MAX_SIGN_LEN];
@@ -327,31 +282,6 @@ static void emitCallBySignature(CompileUnit *cu, Signature *signature, OpCode op
 static void emitCall(CompileUnit *cu, int numArgs, const char *name, int length) {
     int symbolIndex = ensureSymbolExist(cu->curParser->vm, &cu->curParser->vm->allMethodNames, name, length);
     writeOpCodeShortOperand(cu, OPCODE_CALL0 + numArgs, symbolIndex);
-}
-
-//中缀运算符.led方法
-static void infixOperator(CompileUnit *cu, bool canAssign UNUSED) {
-    SymbolBindRule *rule = &Rules[cu->curParser->preToken.tokenType];
-
-    //中缀运算符对左右操作数的绑定权值一样
-    BindPower rbp = rule->lbp;
-    expression(cu, rbp); //解析右操作数
-
-    //生成一个参数的签名
-    Signature signature = {SIGN_METHOD, rule->id, strlen(rule->id), 1};
-    emitCallBySignature(cu, &signature, OPCODE_CALL0);
-}
-
-//前缀运算符.nud方法，-,!等
-static void unaryOperator(CompileUnit *cu, bool canAssign UNUSED) {
-    SymbolBindRule *rule = &Rules[cu->curParser->preToken.tokenType];
-
-    //BP_UNARY作为rbp去调用expression解析右操作数
-    expression(cu, BP_UNARY);
-
-    //生成调用前缀运算符的指令
-    //0个参数，前缀运算符都是1个字符，长度为1
-    emitCall(cu, 0, rule->id, 1);
 }
 
 //添加局部变量到cu
@@ -791,6 +721,53 @@ static void emitMethodCall(CompileUnit *cu, const char *name, uint32_t length, O
         emitGetterMethodCall(cu, &signature, opCode);
 }
 
+//生成加载类的指令
+static void emitLoadModuleVar(CompileUnit *cu, const char *name) {
+    int index = getIndexFromSymbolTable(&cu->curParser->curModule->moduleVarName, name, strlen(name));
+    ASSERT(index != -1, "symbol should have been defined.");
+    writeOpCodeShortOperand(cu, OPCODE_LOAD_MODULE_VAR, index);
+}
+
+//内嵌表达式.nud()
+static void stringInterpolation(CompileUnit *cu, bool canAssign UNUSED) {
+    // a % (b + c) d % (e) f
+    //会按照一下形式编译
+    //["a", b + c, " d ", e, "f "].join()
+    //其中a和d都是TOKEN_INTERPOLATION，b c e都是TOKEN_ID，f是TOKEN_STRING
+
+    //创造一个list实例，拆分字符串，将拆分出的各部分作为元素添加到list
+    emitLoadModuleVar(cu, "list");
+    emitCall(cu, 0, "new()", 5);
+
+    //每次处理字符串中的一个内嵌表达式，包括两部分，以a % (b + c)为例：
+    //1 加载TOKEN_INTERPOLATION对应的字符串，如a，将其添加到list
+    //2 解析内嵌表达式，如b + c，将其结果添加到list
+    do {
+        //1 处理TOKEN_INTERPOLATION中的字符串，如a % (b + c)中的a
+        literal(cu, false);
+        //将字符串添加到list
+        emitCall(cu, 1, "addCore_(_)", 11); //以_结尾的方法名是内部使用
+
+        //2 解析内嵌表达式，如a % (b + c)中的b + c
+        expression(cu, BP_LOWEST);
+        //将结果添加到list
+        emitCall(cu, 1, "addCore_(_)", 11);
+    } while (matchToken(cu->curParser, TOKEN_INTERPOLATION));
+    //处理下一个内嵌表达式，如a % (b + c) d % (e) f中的d % (e)
+
+    //读取最后的字符串，a % (b + c) d % (e) f中的f
+    consumeCurToken(cu->curParser, TOKEN_STRING, "expect string at the end of interpolation.");
+
+    //加载最后的字符串
+    literal(cu, false);
+
+    //将字符串添加到list
+    emitCall(cu, 1, "addCore_(_)", 11);
+
+    //最后将以上list中的元素join为一个字符串
+    emitCall(cu, 0, "join()", 6);
+}
+
 //小写字符开头便是局部变量
 static bool isLocalName(const char *name) {
     return (bool) (name[0] >= 'a' && name[0] <= 'z');
@@ -842,7 +819,7 @@ static void id(CompileUnit *cu, bool canAssign) {
     } else { //否则按照各种变量来处理
         //按照局部变量和upvalue来处理
         Variable var = getVarFromLocalOrUpvalue(cu, name.start, name.length);
-        if (var.index == -1) {
+        if (var.index != -1) {
             emitLoadOrStoreVariable(cu, canAssign, var);
             return;
         }
@@ -920,6 +897,78 @@ static void id(CompileUnit *cu, bool canAssign) {
         }
         emitLoadOrStoreVariable(cu, canAssign, var);
     }
+}
+
+//不关注左操作数的符号称为前缀符号
+//用于如字面量、变量名、前缀符号等非运算符
+#define PREFIX_SYMBOL(nud) {NULL, BP_NONE, nud, NULL, NULL}
+
+//前缀运算符，如!
+#define PREFIX_OPERATOR(id) {id, BP_NONE, unaryOperator, NULL, unaryMethodSignature}
+
+//关注左操作数的符号为中缀符号
+//数组[，函数(，实例与方法之间的.等
+#define INFIX_SYMBOL(lbp, led) {NULL, lbp, NULL, led, NULL}
+
+//中缀运算符
+#define INFIX_OPERATOR(id, lbp) {id, lbp, NULL, infixOperator, infixMethodSignature}
+
+//既可做前缀又可以做中缀的运算符，例如-
+#define MIX_OPERATOR(id) {id, BP_TERM, unaryOperator, infixOperator, mixMethodSignature}
+
+//占位符
+#define UNUSED_RULE {NULL, BP_NONE, NULL, NULL, NULL}
+
+SymbolBindRule Rules[] = {
+        UNUSED_RULE, //TOKEN_INVALID
+        PREFIX_SYMBOL(literal), //TOKEN_NUM
+        PREFIX_SYMBOL(literal), //TOKEN_STRING
+        {NULL, BP_LOWEST, id, NULL, idMethodSignature}, //TOKEN_ID
+        PREFIX_SYMBOL(stringInterpolation), //TOKEN_INTERPOLATION
+};
+
+//语法分析核心
+static void expression(CompileUnit *cu, BindPower rbp) {
+    //以中缀运算符表达式aSwTe为例，大写字符表示运算符，小写表示操作数
+    //进入expression时，curToken为操作数w，preToken是运算符S
+    DenotationFun nud = Rules[cu->curParser->curToken.tokenType].nud;
+
+    //表达式开头的要么是操作数要么是前缀运算符，必然有nud方法
+    ASSERT(nud != NULL, "nud is NULL.");
+    getNextToken(cu->curParser); //执行后curToken为运算符T
+    bool canAssign = rbp < BP_ASSIGN;
+    nud(cu, canAssign); //计算操作数w的值
+
+    while (rbp < Rules[cu->curParser->curToken.tokenType].lbp) {
+        DenotationFun led = Rules[cu->curParser->curToken.tokenType].led;
+        getNextToken(cu->curParser); //执行后curToken为e
+        led(cu, canAssign); //计算运算符T.led方法
+    }
+}
+
+//中缀运算符.led方法
+static void infixOperator(CompileUnit *cu, bool canAssign UNUSED) {
+    SymbolBindRule *rule = &Rules[cu->curParser->preToken.tokenType];
+
+    //中缀运算符对左右操作数的绑定权值一样
+    BindPower rbp = rule->lbp;
+    expression(cu, rbp); //解析右操作数
+
+    //生成一个参数的签名
+    Signature signature = {SIGN_METHOD, rule->id, strlen(rule->id), 1};
+    emitCallBySignature(cu, &signature, OPCODE_CALL0);
+}
+
+//前缀运算符.nud方法，-,!等
+static void unaryOperator(CompileUnit *cu, bool canAssign UNUSED) {
+    SymbolBindRule *rule = &Rules[cu->curParser->preToken.tokenType];
+
+    //BP_UNARY作为rbp去调用expression解析右操作数
+    expression(cu, BP_UNARY);
+
+    //生成调用前缀运算符的指令
+    //0个参数，前缀运算符都是1个字符，长度为1
+    emitCall(cu, 0, rule->id, 1);
 }
 
 //在模块objModule中定义名为name，值为value的模块变量

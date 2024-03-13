@@ -15,3 +15,6 @@
 
 ## 常量符号表
 函数对象（见objectAndClass/include/obj_fun.h文件）中有一个成员constants，类型为ValueBuffer，其即常量表。
+
+## 标识符
+本系统局部变量名以小写字符开头，具体见compiler.c文件static bool isLocalName(const char *name);
