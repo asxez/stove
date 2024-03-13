@@ -791,6 +791,137 @@ static void emitMethodCall(CompileUnit *cu, const char *name, uint32_t length, O
         emitGetterMethodCall(cu, &signature, opCode);
 }
 
+//小写字符开头便是局部变量
+static bool isLocalName(const char *name) {
+    return (bool) (name[0] >= 'a' && name[0] <= 'z');
+}
+
+//标识符.nud()：变量名或方法名
+static void id(CompileUnit *cu, bool canAssign) {
+    //备份变量名
+    Token name = cu->curParser->preToken;
+    ClassBookKeep *classBK = getEnclosingClassBK(cu);
+
+    //标识符可以是任意符号，按照此顺序处理
+    //函数调用->局部变量和Upvalue->实例域->静态域->类getter方法调用->模块变量
+
+    //处理函数调用
+    if (cu->enclosingUnit == NULL && matchToken(cu->curParser, TOKEN_LEFT_PAREN)) {
+        char id[MAX_ID_LEN] = {EOS};
+        //函数名加上"Fun"前缀作为模块变量名，检查前面是否已有此函数的定义
+        memmove(id, "Fun ", 4);
+        memmove(id + 4, name.start, name.length);
+
+        Variable var;
+        var.scopeType = VAR_SCOPE_MODULE;
+        var.index = getIndexFromSymbolTable(&cu->curParser->curModule->moduleVarName, id, strlen(id));
+        if (var.index == -1) {
+            memmove(id, name.start, name.length);
+            id[name.length] = EOS;
+            COMPILE_ERROR(cu->curParser, "undefined function: '%s'.", id);
+        }
+        //1.把模块变量即函数闭包加载到栈
+        emitLoadVariable(cu, var);
+
+        Signature signature;
+        //函数调用的形式和method类似，只不过method有一个可选的块参数
+        signature.signatureType = SIGN_METHOD;
+        //把函数调用编译为“闭包.call”的形式，故name为call
+        signature.name = "call";
+        signature.length = 4;
+        signature.argNum = 0;
+
+        //若后面不是)，说明有参数列表
+        if (!matchToken(cu->curParser, TOKEN_RIGHT_PAREN)) {
+            //2.压入实参
+            processArgList(cu, &signature);
+            consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after argument list.");
+        }
+        //3.生成调用指令以调用函数
+        emitCallBySignature(cu, &signature, OPCODE_CALL0);
+    } else { //否则按照各种变量来处理
+        //按照局部变量和upvalue来处理
+        Variable var = getVarFromLocalOrUpvalue(cu, name.start, name.length);
+        if (var.index == -1) {
+            emitLoadOrStoreVariable(cu, canAssign, var);
+            return;
+        }
+
+        //按照实例域来处理
+        if (classBK != NULL) {
+            int fieldIndex = getIndexFromSymbolTable(&classBK->fields, name.start, name.length);
+            if (fieldIndex != -1) {
+                bool isRead = true;
+                if (canAssign && matchToken(cu->curParser, TOKEN_ASSIGN)) {
+                    isRead = false;
+                    expression(cu, BP_LOWEST);
+                }
+
+                //如果当前正在编译类方法，则直接在该实例对象中加载field
+                if (cu->enclosingUnit != NULL)
+                    writeOpCodeByteOperand(cu, isRead ? OPCODE_LOAD_SELF_FIELD : OPCODE_STORE_SELF_FIELD, fieldIndex);
+                else {
+                    emitLoadSelf(cu);
+                    writeOpCodeByteOperand(cu, isRead ? OPCODE_LOAD_FIELD : OPCODE_STORE_FIELD, fieldIndex);
+                }
+                return;
+            }
+        }
+
+        //按照静态域查找
+        if (classBK != NULL) {
+            char *staticFieldId = ALLOCATE_ARRAY(cu->curParser->vm, char, MAX_ID_LEN);
+            memset(staticFieldId, 0, MAX_ID_LEN);
+            uint32_t staticFieldIdLen;
+            char *clsName = classBK->name->value.start;
+            uint32_t clsLen = classBK->name->value.length;
+
+            //各类中静态域的名称以"Cls类名 静态域名"来命名
+            memmove(staticFieldId, "Cls", 3);
+            memmove(staticFieldId + 3, clsName, clsLen);
+            memmove(staticFieldId + 3 + clsLen, " ", 1);
+            const char *tkName = name.start;
+            uint32_t tkLen = name.length;
+            memmove(staticFieldId + 4 + clsLen, tkName, tkLen);
+            staticFieldIdLen = strlen(staticFieldId);
+            var = getVarFromLocalOrUpvalue(cu, staticFieldId, staticFieldIdLen);
+
+            DEALLOCATE_ARRAY(cu->curParser->vm, staticFieldId, MAX_ID_LEN);
+            if (var.index != -1) {
+                emitLoadOrStoreVariable(cu, canAssign, var);
+                return;
+            }
+        }
+
+        //如果以上未找到同名变量，有可能是该标识符是同类中的其他方法调用
+        //方法规定以小写字符开头
+        if (classBK != NULL && isLocalName(name.start)) {
+            emitLoadSelf(cu); //确保args[0]是self对象，以便查找到方法
+            //因为类可能尚未编译完，未统计完所有方法，故此时无法判断方法是否未定义，留待运行时检测
+            emitMethodCall(cu, name.start, name.length, OPCODE_CALL0, canAssign);
+            return;
+        }
+
+        //按照模块变量处理
+        var.scopeType = VAR_SCOPE_MODULE;
+        var.index = getIndexFromSymbolTable(&cu->curParser->curModule->moduleVarName, name.start, name.length);
+        if (var.index == -1) {
+            //模块变量属于模块作用域，若当前引用处之前未定义该模块变量，说不定在后面有其定义，因此暂时先声明它，待模块统计完后再检查
+            //用关键字fun定义的函数是以前缀Fun后接函数名作为模块变量，下面加上Fun前缀按照函数名重新查找
+            char funName[MAX_SIGN_LEN + 5] = {EOS};
+            memmove(funName, "Fun ", 4);
+            memmove(funName + 4, name.start, name.length);
+            var.index = getIndexFromSymbolTable(&cu->curParser->curModule->moduleVarName, funName, strlen(funName));
+
+            //若不是函数名，那么可能是该模块变量定义在引用处的后面，先将行号作为该变量值去声明
+            if (var.index == -1)
+                var.index = declareModuleVar(cu->curParser->vm, cu->curParser->curModule, name.start, name.length,
+                                             NUM_TO_VALUE(cu->curParser->curToken.lineNo));
+        }
+        emitLoadOrStoreVariable(cu, canAssign, var);
+    }
+}
+
 //在模块objModule中定义名为name，值为value的模块变量
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
     if (length > MAX_ID_LEN) {
