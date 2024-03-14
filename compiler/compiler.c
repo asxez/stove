@@ -807,6 +807,67 @@ static void super(CompileUnit *cu, bool canAssign) {
         emitGetterMethodCall(cu, enclosingClassBK->signature, OPCODE_SUPER0);
 }
 
+//编译圆括号
+static void parentheses(CompileUnit *cu, bool canAssign UNUSED) {
+    //本函数是'('.nud()，假设curToken是(
+    expression(cu, BP_LOWEST);
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after expression.");
+}
+
+//'['.nud()，处理用字面量形式定义的列表
+static void listLiteral(CompileUnit *cu, bool canAssign UNUSED) {
+    //进入本函数后，curToken是[右边的符号
+    //创建列表对象
+    emitLoadModuleVar(cu, "List");
+    emitCall(cu, 0, "new()", 5);
+
+    do {
+        //支持字面量形式定义的空列表
+        if (PEEK_TOKEN(cu->curParser) == TOKEN_RIGHT_BRACKET)
+            break;
+        expression(cu, BP_LOWEST);
+        emitCall(cu, 1, "addCore_(_)", 11);
+    } while (matchToken(cu->curParser, TOKEN_COMMA));
+
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_BRACKET, "expect ']' after list element.");
+}
+
+//'['.led()，用于索引列表元素
+static void subscript(CompileUnit *cu, bool canAssign) {
+    //确保[]之间不为空
+    if (matchToken(cu->curParser, TOKEN_RIGHT_BRACKET))
+        COMPILE_ERROR(cu->curParser, "need argument when index.");
+
+    //默认是[_]，即subscript getter
+    Signature signature = {SIGN_SUBSCRIPT, "", 0, 0};
+
+    //读取参数并把参数加载到栈，统计参数个数
+    processArgList(cu, &signature);
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_BRACKET, "expect ']' after argument list.");
+
+    //如果是[_] = (_)，即subscript setter
+    if (canAssign && matchToken(cu->curParser, TOKEN_ASSIGN)) {
+        signature.signatureType = SIGN_SUBSCRIPT_SETTER;
+
+        //=右边的值也算一个参数，签名是[args[1]] = (args[2])
+        if (++signature.argNum > MAX_ARG_NUM)
+            COMPILE_ERROR(cu->curParser, "the max number of argument is %d.", MAX_ARG_NUM);
+
+        //获取=右边的表达式
+        expression(cu, BP_LOWEST);
+    }
+    emitCallBySignature(cu, &signature, OPCODE_CALL0);
+}
+
+//为下标操作符[编译签名
+static void subscriptMethodSignature(CompileUnit *cu, Signature *signature) {
+    signature->signatureType = SIGN_SUBSCRIPT;
+    signature->length = 0;
+    processParaList(cu, signature);
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_BRACKET, "expect ']' after index list.");
+    trySetter(cu, signature); //判断]后面是否接=为setter
+}
+
 //小写字符开头便是局部变量
 static bool isLocalName(const char *name) {
     return (bool) (name[0] >= 'a' && name[0] <= 'z');
@@ -981,6 +1042,13 @@ SymbolBindRule Rules[] = {
         UNUSED_RULE, //TOKEN_STATIC
         INFIX_OPERATOR("is", BP_IS), //TOKEN_IS
         PREFIX_SYMBOL(super), //TOKEN_SUPER
+        UNUSED_RULE, //TOKEN_IMPORT
+        UNUSED_RULE, //TOKEN_COMMA
+        UNUSED_RULE, //TOKEN_COMMA
+        PREFIX_SYMBOL(parentheses), //TOKEN_LEFT_PAREN
+        UNUSED_RULE, //TOKEN_RIGHT_PAREN
+        {NULL, BP_CALL, listLiteral, subscript, subscriptMethodSignature}, //TOKEN_LEFT_BRACKET
+        UNUSED_RULE, //TOKEN_RIGHT_BRACKET
 };
 
 //语法分析核心
