@@ -868,6 +868,40 @@ static void subscriptMethodSignature(CompileUnit *cu, Signature *signature) {
     trySetter(cu, signature); //判断]后面是否接=为setter
 }
 
+//'.'.led()，编译方法调用，所有调用的入口
+static void callEntry(CompileUnit *cu, bool canAssign) {
+    //本函数是'.'.led()，curToken是TOKEN_ID
+    consumeCurToken(cu->curParser, TOKEN_ID, "expect method name after '.'.");
+    //生成方法调用指令
+    emitMethodCall(cu, cu->curParser->preToken.start, cu->curParser->preToken.length, OPCODE_CALL0, canAssign);
+}
+
+//map对象字面量
+static void mapLiteral(CompileUnit *cu, bool canAssign UNUSED) {
+    //本函数是'{'.nud()，curToken是key
+    //Map.new()新建map，为存储字面量中的key->value做准备
+    //先加载类，用于调用方法时从该类的methods中定位方法
+    emitLoadModuleVar(cu, "Map");
+    //再加载调用的方法，该方法将在上面加载的类中获取
+    emitCall(cu, 0, "new()", 5);
+
+    do {
+        //可以创建空map
+        if (PEEK_TOKEN(cu->curParser) == TOKEN_RIGHT_BRACE)
+            break;
+
+        //读取key
+        expression(cu, BP_UNARY);
+        //读入key后面的冒号
+        consumeCurToken(cu->curParser, TOKEN_COLON, "expect ':' after key.");
+        //读取value
+        expression(cu, BP_LOWEST);
+        //将entry添加到map中
+        emitCall(cu, 2, "addCore_(_,_)", 13);
+    } while (matchToken(cu->curParser, TOKEN_COMMA));
+    consumeCurToken(cu->curParser, TOKEN_RIGHT_BRACE, "map literal should end with ')'.");
+}
+
 //小写字符开头便是局部变量
 static bool isLocalName(const char *name) {
     return (bool) (name[0] >= 'a' && name[0] <= 'z');
@@ -1049,6 +1083,9 @@ SymbolBindRule Rules[] = {
         UNUSED_RULE, //TOKEN_RIGHT_PAREN
         {NULL, BP_CALL, listLiteral, subscript, subscriptMethodSignature}, //TOKEN_LEFT_BRACKET
         UNUSED_RULE, //TOKEN_RIGHT_BRACKET
+        PREFIX_SYMBOL(mapLiteral), //TOKEN_LEFT_BRACE
+        UNUSED_RULE, //TOKEN_RIGHT_BRACE
+        INFIX_SYMBOL(BP_CALL, callEntry), //TOKEN_DOT
 };
 
 //语法分析核心
