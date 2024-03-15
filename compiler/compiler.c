@@ -79,6 +79,8 @@ static void compileProgram(CompileUnit *cu);
 
 static void infixOperator(CompileUnit *cu, bool canAssign UNUSED);
 
+static void unaryOperator(CompileUnit *cu, bool canAssign UNUSED);
+
 typedef struct {
     const char *id; //符号
     BindPower lbp; //左绑定权值
@@ -723,6 +725,65 @@ static void emitMethodCall(CompileUnit *cu, const char *name, uint32_t length, O
         emitGetterMethodCall(cu, &signature, opCode);
 }
 
+//用占位符作为参数设置指令
+static uint32_t emitInstrWithPlaceholder(CompileUnit *cu, OpCode opCode) {
+    writeOpCode(cu, opCode);
+    writeByte(cu, 0xff); //先写入高位的0xff
+
+    //再写入低位的0xff后，减1返回高位地址，此地址将来用于回填
+    return writeByte(cu, 0xff) - 1;
+}
+
+//用跳转到当前字节码结束地址的偏移量去替换占位符参数0xffff
+//absIndex是指令流中绝对索引
+static void patchPlaceholder(CompileUnit *cu, uint32_t absIndex) {
+    //计算回填地址（索引）
+    uint32_t offset = cu->fun->instrStream.count - absIndex - 2;
+    //先回填地址高8位
+    cu->fun->instrStream.datas[absIndex] = (offset >> 8) & 0xff;
+    //再回填地址低8位
+    cu->fun->instrStream.datas[absIndex + 1] = offset & 0xff;
+}
+
+//'||'.led()
+static void logicOr(CompileUnit *cu, bool canAssign UNUSED) {
+    //此时栈顶是条件表达式的结果，即||的左操作数
+    //操作码OPCODE_OR会到栈顶获取条件
+    uint32_t placeholderIndex = emitInstrWithPlaceholder(cu, OPCODE_OR);
+    //生成计算右操作数的指令
+    expression(cu, BP_LOGIC_OR);
+    //用右表达式的实际结束地址来回填OPCODE_OR操作码的占位符
+    patchPlaceholder(cu, placeholderIndex);
+}
+
+//'&&'.led()
+static void logicAnd(CompileUnit *cu, bool canAssign UNUSED) {
+    //此时栈顶是条件表达式的结果，即&&的左操作数
+    //操作码OPCODE_AND会到栈顶获取条件
+    uint32_t placeholderIndex = emitInstrWithPlaceholder(cu, OPCODE_AND);
+    //生成计算右操作数的指令
+    expression(cu, BP_LOGIC_AND);
+    //用右表达式的实际结束地址来回填OPCODE_AND操作码的占位符
+    patchPlaceholder(cu, placeholderIndex);
+}
+
+//"? :".led()
+static void condition(CompileUnit *cu, bool canAssign UNUSED) {
+    //若condition为false，if跳转到false分支的起始地址，为该地址设置占位符
+    uint32_t falseBranchStart = emitInstrWithPlaceholder(cu, OPCODE_JUMP_IF_FALSE);
+    //编译true分支
+    expression(cu, BP_LOWEST);
+    consumeCurToken(cu->curParser, TOKEN_COLON, "expect ':' after true branch.");
+    //执行完true分支后需要跳过false分支
+    uint32_t falseBranchEnd = emitInstrWithPlaceholder(cu, OPCODE_JUMP);
+    //编译true分支已经结束，此时知道了true分支的结束地址，编译false分支之前须先回填falseBranchStart
+    patchPlaceholder(cu, falseBranchStart);
+    //编译false分支
+    expression(cu, BP_LOWEST);
+    //知道了false分支的结束地址，回填falseBranchEnd
+    patchPlaceholder(cu, falseBranchEnd);
+}
+
 //生成加载类的指令
 static void emitLoadModuleVar(CompileUnit *cu, const char *name) {
     int index = getIndexFromSymbolTable(&cu->curParser->curModule->moduleVarName, name, strlen(name));
@@ -1086,6 +1147,29 @@ SymbolBindRule Rules[] = {
         PREFIX_SYMBOL(mapLiteral), //TOKEN_LEFT_BRACE
         UNUSED_RULE, //TOKEN_RIGHT_BRACE
         INFIX_SYMBOL(BP_CALL, callEntry), //TOKEN_DOT
+        INFIX_OPERATOR("..", BP_RANGE), //TOKEN_DOT_DOT
+        INFIX_OPERATOR("+", BP_TERM), //TOKEN_ADD
+        INFIX_OPERATOR("-", BP_TERM), //TOKEN_SUB
+        INFIX_OPERATOR("*", BP_FACTOR), //TOKEN_MUL
+        INFIX_OPERATOR("/", BP_FACTOR), //TOKEN_DIV
+        INFIX_OPERATOR("%", BP_FACTOR), //TOKEN_MOD
+        UNUSED_RULE, //TOKEN_ASSIGN
+        INFIX_OPERATOR("&", BP_BIT_AND), //TOKEN_BIT_AND
+        INFIX_OPERATOR("|", BP_BIT_OR), //TOKEN_BIT_OR
+        PREFIX_OPERATOR("~"), //TOKEN_BIT_NOT
+        INFIX_OPERATOR(">>", BP_BIT_SHIFT), //TOKEN_BIT_SHIFT_RIGHT
+        INFIX_OPERATOR("<<", BP_BIT_SHIFT), //TOKEN_BIT_SHIFT_LEFT
+        INFIX_SYMBOL(BP_LOGIC_AND, logicAnd), //TOKEN_LOGIC_AND
+        INFIX_SYMBOL(BP_LOGIC_OR, logicOr), //TOKEN_LOGIC_OR
+        PREFIX_OPERATOR("!"), //TOKEN_LOGIC_NOT
+        INFIX_OPERATOR("==", BP_EQUAL), //TOKEN_EQUAL
+        INFIX_OPERATOR("!=", BP_EQUAL), //TOKEN_NOT_EQUAL
+        INFIX_OPERATOR(">", BP_CMP), //TOKEN_MORE
+        INFIX_OPERATOR(">=", BP_CMP), //TOKEN_MORE_EQUAL
+        INFIX_OPERATOR("<", BP_CMP), //TOKEN_LESS
+        INFIX_OPERATOR("<=", BP_CMP), //TOKEN_LESS_EQUAL
+        INFIX_SYMBOL(BP_ASSIGN, condition), //TOKEN_QUESTION
+        UNUSED_RULE, //TOKEN_EOF
 };
 
 //语法分析核心
