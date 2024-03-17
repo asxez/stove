@@ -537,6 +537,31 @@ static Variable getVarFromLocalOrUpvalue(CompileUnit *cu, const char *name, uint
     return var;
 }
 
+//定义变量为其赋值
+static void defineVariable(CompileUnit *cu, uint32_t index) {
+    //局部变量已存储到栈中,无须处理.
+    //模块变量并不存储到栈中,因此将其写回相应位置
+    if (cu->scopeDepth == -1) {
+        //把栈顶数据存入参数index指定的全局模块变量
+        writeOpCodeShortOperand(cu, OPCODE_STORE_MODULE_VAR, index);
+        writeOpCode(cu, OPCODE_POP);  //弹出栈顶数据,因为上面OPCODE_STORE_MODULE_VAR已经将其存储了
+    }
+}
+
+//从局部变量，upvalue和模块中查找变量name
+static Variable findVariable(CompileUnit *cu, const char *name, uint32_t length) {
+    //先从局部变量和upvalue中查找
+    Variable var = getVarFromLocalOrUpvalue(cu, name, length);
+    if (var.index != -1)
+        return var;
+
+    //若未找到再从模块变量中查找
+    var.index = getIndexFromSymbolTable(&cu->curParser->curModule->moduleVarName, name, length);
+    if (var.index != -1)
+        var.scopeType = VAR_SCOPE_MODULE;
+    return var;
+}
+
 //生成把变量var加载到栈的指令
 static void emitLoadVariable(CompileUnit *cu, Variable var) {
     switch (var.scopeType) {
@@ -1242,6 +1267,79 @@ int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t len
         symbolIndex = -1;
 
     return symbolIndex;
+}
+
+//编译变量定义
+static void compileVarDefinition(CompileUnit *cu, bool isStatic) {
+    consumeCurToken(cu->curParser, TOKEN_ID, "missing variable name.");
+    Token name = cu->curParser->preToken;
+    //只支持定义单个变量
+    if (cu->curParser->curToken.tokenType == TOKEN_COMMA)
+        COMPILE_ERROR(cu->curParser, "'var' only support declaring one variable.");
+
+    //1. 先判断是否是类中的域定义，确保cu是模块cu
+    if (cu->enclosingUnit == NULL && cu->enclosingClassBK != NULL) {
+        if (isStatic) { //静态域
+            char *staticFieldId = ALLOCATE_ARRAY(cu->curParser->vm, char, MAX_ID_LEN);
+            memset(staticFieldId, 0, MAX_ID_LEN);
+            uint32_t staticFieldLen;
+            char *clsName = cu->enclosingClassBK->name->value.start;
+            uint32_t clsLen = cu->enclosingClassBK->name->value.length;
+
+            //用前缀“'Cls '+类名+变量名”作为静态域在模块编译单元中的局部变量
+            memmove(staticFieldId, "Cls", 3);
+            memmove(staticFieldId + 3, clsName, clsLen);
+            memmove(staticFieldId + 3 + clsLen, " ", 1);
+            const char *tkName = name.start;
+            uint32_t tkLen = name.length;
+            memmove(staticFieldId + 4 + clsLen, tkName, tkLen);
+            staticFieldLen = strlen(staticFieldId);
+
+            if (findLocal(cu, staticFieldId, staticFieldLen) == -1) {
+                int index = declareLocalVar(cu, staticFieldId, staticFieldLen);
+                writeOpCode(cu, OPCODE_PUSH_NULL);
+                ASSERT(cu->scopeDepth == 0, "should in class scope.");
+                defineVariable(cu, index);
+
+                //静态域可初始化
+                Variable var = findVariable(cu, staticFieldId, staticFieldLen);
+                if (matchToken(cu->curParser, TOKEN_ASSIGN)) {
+                    expression(cu, BP_LOWEST);
+                    emitStoreVariable(cu, var);
+                }
+            } else
+                COMPILE_ERROR(cu->curParser, "static field '%s' redefinition.", strchr(staticFieldId, ' ') + 1);
+        } else { //定义实例域
+            ClassBookKeep *classBK = getEnclosingClassBK(cu);
+            int fieldIndex = getIndexFromSymbolTable(&classBK->fields, name.start, name.length);
+            if (fieldIndex == -1)
+                fieldIndex = addSymbol(cu->curParser->vm, &classBK->fields, name.start, name.length);
+            else {
+                if (fieldIndex > MAX_FIELD_NUM)
+                    COMPILE_ERROR(cu->curParser, "the max number of instance field is %d", MAX_FIELD_NUM);
+                else {
+                    char id[MAX_ID_LEN] = {EOS};
+                    memcpy(id, name.start, name.length);
+                    COMPILE_ERROR(cu->curParser, "instance field '%s' redefinition.", id);
+                }
+
+                if (matchToken(cu->curParser, TOKEN_ASSIGN))
+                    COMPILE_ERROR(cu->curParser, "instance field isn't allowed initialization.");
+            }
+        }
+        return;
+    }
+
+    //2. 若不是类中的域定义，就按照一般的变量定义
+    if (matchToken(cu->curParser, TOKEN_ASSIGN))
+        //若在定义时赋值就解析表达式，结果会留到栈顶
+        expression(cu, BP_LOWEST);
+    else
+        //否则就初始化为NULL，即在栈顶压入NULL，也是为了与上面显式初始化保存相同栈结构
+        writeOpCode(cu, OPCODE_PUSH_NULL);
+
+    uint32_t index = declareVariable(cu, name.start, name.length);
+    defineVariable(cu, index);
 }
 
 //编译程序
