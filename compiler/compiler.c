@@ -322,6 +322,25 @@ static int declareLocalVar(CompileUnit *cu, const char *name, uint32_t length) {
     return (int) addLocalVar(cu, name, length);
 }
 
+//丢掉作用域scopeDepth之内的局部变量
+static uint32_t discardLocalVar(CompileUnit *cu, int scopeDepth) {
+    ASSERT(cu->scopeDepth > -1, "upmost scope can't exit.");
+    int localIdx = cu->localVarNum - 1;
+
+    //变量作用域大于scopeDepth的为其内嵌作用域中的变量，跳出scopeDepth时内层也没用了，要回收其局部变量
+    while (localIdx >= 0 && cu->localVars[localIdx].scopeDepth >= scopeDepth) {
+        if (cu->localVars[localIdx].isUpvalue)
+            //若此时局部变量是其内层的upvalue就将其关闭
+            writeByte(cu, OPCODE_CLOSE_UPVALUE);
+        else
+            //否则就弹出该变量回收空间
+            writeByte(cu, OPCODE_POP);
+        localIdx--;
+    }
+    //返回丢掉的局部变量个数
+    return cu->localVarNum - 1 - localIdx;
+}
+
 //根据作用域声明变量
 static int declareVariable(CompileUnit *cu, const char *name, uint32_t length) {
     //若当前是模块作用域就声明为模块变量
@@ -1528,12 +1547,53 @@ static void compileWhileStatement(CompileUnit *cu) {
     leaveLoopPatch(cu);
 }
 
+//编译return
+static void compileReturn(CompileUnit *cu) {
+    if (PEEK_TOKEN(cu->curParser) == TOKEN_RIGHT_BRACE) //空返回值
+        //空return，NULL作为返回值
+        writeOpCode(cu, OPCODE_PUSH_NULL);
+    else
+        //有返回值
+        expression(cu, BP_LOWEST);
+    writeOpCode(cu, OPCODE_RETURN); //将上面栈顶的值返回
+}
+
+//编译break
+static void compileBreak(CompileUnit *cu) {
+    if (cu->curLoop == NULL)
+        COMPILE_ERROR(cu->curParser, "break should be used inside a loop.");
+    //退出循环体之前要丢掉循环体内的局部变量
+    discardLocalVar(cu, cu->curLoop->scopeDepth + 1);
+
+    //由于用OPCODE_END表示break占位，此时无须记录占位符的返回地址
+    emitInstrWithPlaceholder(cu, OPCODE_END);
+}
+
+//编译continue
+static void compileContinue(CompileUnit *cu) {
+    if (cu->curLoop == NULL)
+        COMPILE_ERROR(cu->curParser, "continue should be used inside a loop.");
+
+    discardLocalVar(cu, cu->curLoop->scopeDepth + 1);
+
+    int loopBackOffset = cu->fun->instrStream.count - cu->curLoop->condStartIndex + 2;
+
+    //生成向回跳转的CODE_LOOP指令，即使ip -= loopBackOffset
+    writeOpCodeShortOperand(cu, OPCODE_LOOP, loopBackOffset);
+}
+
 //编译语句
 static void compileStatement(CompileUnit *cu) {
     if (matchToken(cu->curParser, TOKEN_IF))
         compileIfStatement(cu);
     else if (matchToken(cu->curParser, TOKEN_WHILE))
         compileWhileStatement(cu);
+    else if (matchToken(cu->curParser, TOKEN_RETURN))
+        compileReturn(cu);
+    else if (matchToken(cu->curParser, TOKEN_BREAK))
+        compileBreak(cu);
+    else if (matchToken(cu->curParser, TOKEN_CONTINUE))
+        compileContinue(cu);
 }
 
 //编译程序
