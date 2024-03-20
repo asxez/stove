@@ -1744,6 +1744,104 @@ static void defineMethod(CompileUnit *cu, Variable classVar, bool isStatic, int 
     writeOpCodeShortOperand(cu, opCode, methodIndex);
 }
 
+//分两步创建实例，constructorIndex是构造函数的索引
+static void emitCreateInstance(CompileUnit *cu, Signature *signature, uint32_t constructorIndex) {
+    CompileUnit methodCU;
+    initCompileUnit(cu->curParser, &methodCU, cu, true);
+
+    //1. 生成OPCODE_CONSTRUCT指令，该指令生成新实例存储到stack[0]
+    writeOpCode(&methodCU, OPCODE_CONSTRUCT);
+
+    //2. 生成OPCODE_CALLx指令，该指令调用新实例的构造函数
+    writeOpCodeShortOperand(&methodCU, (OpCode) (OPCODE_CALL0 + signature->argNum), constructorIndex);
+
+    //生成return指令，将栈顶中的实例返回
+    writeOpCode(&methodCU, OPCODE_RETURN);
+
+#if DEBUG
+    endCompileUnit(&methodCU, "", 0);
+#else
+    endCompileUnit(&methodCU);
+#endif
+}
+
+//编译方法定义，isStatic表示是否在编译静态方法
+static void compileMethod(CompileUnit *cu, Variable classVar, bool isStatic) {
+    //inStatic表示是否为静态方法的编译单元
+    cu->enclosingClassBK->inStatic = isStatic;
+    methodSignatureFun methodSign = Rules[cu->curParser->curToken.tokenType].methodSignature;
+    if (methodSign == NULL)
+        COMPILE_ERROR(cu->curParser, "method need signature function.");
+
+    Signature signature;
+    //curToken是方法名
+    signature.name = cu->curParser->curToken.start;
+    signature.length = cu->curParser->curToken.length;
+    signature.argNum = 0;
+
+    cu->enclosingClassBK->signature = &signature;
+    getNextToken(cu->curParser);
+
+    //为了将函数或方法自己的指令流和局部变量单独存储，每个函数或方法都有自己的CompileUnit
+    CompileUnit methodCU;
+    //编译一个方法，因此形参isMethod为true
+    initCompileUnit(cu->curParser, &methodCU, cu, true);
+
+    //构造签名
+    methodSign(&methodCU, &signature);
+    consumeCurToken(cu->curParser, TOKEN_LEFT_BRACE, "expect '{' at the beginning of method body.");
+
+    if (cu->enclosingClassBK->inStatic && signature.signatureType == SIGN_CONSTRUCT)
+        COMPILE_ERROR(cu->curParser, "constructor is not allowed to be static.");
+
+    char signatureString[MAX_SIGN_LEN] = {EOS};
+    uint32_t signLen = signToString(&signature, signatureString);
+
+    //声明方法
+    uint32_t methodIndex = declareMethod(cu, signatureString, signLen);
+
+    //编译方法体指令流到自己的编译单元methodCU
+    compileBody(&methodCU, signature.signatureType == SIGN_CONSTRUCT);
+
+#if DEBUG
+    //结束编译并创建方法闭包
+    endCompileUnit(&methodCU, signatureString, signLen);
+#else
+    //结束编译并创建方法闭包
+    endCompileUnit(&methodCU);
+#endif
+
+    //定义方法：将上面创建的方法闭包绑定到类
+    defineMethod(cu, classVar, cu->enclosingClassBK->inStatic, methodIndex);
+
+    if (signature.signatureType == SIGN_CONSTRUCT) {
+        signature.signatureType = SIGN_METHOD;
+        char signatureString[MAX_SIGN_LEN] = {EOS};
+        uint32_t signLen = signToString(&signature, signatureString);
+
+        uint32_t constructorIndex = ensureSymbolExist(cu->curParser->vm, &cu->curParser->vm->allMethodNames,
+                                                      signatureString, signLen);
+
+        emitCreateInstance(cu, &signature, methodIndex);
+
+        //构造函数是静态方法，即类方法
+        defineMethod(cu, classVar, true, constructorIndex);
+    }
+}
+
+//编译类体
+static void compileClassBody(CompileUnit *cu, Variable classVar) {
+    if (matchToken(cu->curParser, TOKEN_STATIC)) {
+        if (matchToken(cu->curParser, TOKEN_VAR)) //处理静态域 static var id
+            compileVarDefinition(cu, true);
+        else //处理静态方法，static methodName
+            compileMethod(cu, classVar, true);
+    } else if (matchToken(cu->curParser, TOKEN_VAR)) //实例域
+        compileVarDefinition(cu, false);
+    else //类的方法
+        compileMethod(cu, classVar, false);
+}
+
 //编译程序
 static void compileProgram(CompileUnit *cu) {
     ;
