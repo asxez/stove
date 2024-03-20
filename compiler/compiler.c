@@ -856,6 +856,13 @@ static void emitLoadModuleVar(CompileUnit *cu, const char *name) {
     writeOpCodeShortOperand(cu, OPCODE_LOAD_MODULE_VAR, index);
 }
 
+//生成存储模块变量的指令
+static void emitStoreModuleVar(CompileUnit *cu, int index) {
+    //把栈顶数据存储到moduleVarValue[index]
+    writeOpCodeShortOperand(cu, OPCODE_STORE_MODULE_VAR, index);
+    writeOpCode(cu, OPCODE_POP); //弹出栈顶数据
+}
+
 //内嵌表达式.nud()
 static void stringInterpolation(CompileUnit *cu, bool canAssign UNUSED) {
     // a % (b + c) d % (e) f
@@ -1691,6 +1698,50 @@ static void compileStatement(CompileUnit *cu) {
         compileBreak(cu);
     else if (matchToken(cu->curParser, TOKEN_CONTINUE))
         compileContinue(cu);
+    else if (matchToken(cu->curParser, TOKEN_LEFT_BRACE)) {
+        //代码块有单独的作用域
+        enterScope(cu);
+        compileBlock(cu);
+        leaveScope(cu);
+    } else {
+        //若不是以上的语法结构则是单一表达式
+        expression(cu, BP_LOWEST);
+
+        //表达式的结果不重要，弹出栈顶结果
+        writeOpCode(cu, OPCODE_POP);
+    }
+}
+
+//声明方法
+static int declareMethod(CompileUnit *cu, char *signStr, uint32_t length) {
+    //确保方法被录入到vm->allMethodNames
+    int index = ensureSymbolExist(cu->curParser->vm, &cu->curParser->vm->allMethodNames, signStr, length);
+
+    //下面判断方法是否已定义，即排除重定义
+    IntBuffer *methods = cu->enclosingClassBK->inStatic ? &cu->enclosingClassBK->staticMethods
+                                                        : &cu->enclosingClassBK->instantMethods;
+    uint32_t idx = 0;
+    while (idx < methods->count) {
+        if (methods->datas[idx] == index)
+            COMPILE_ERROR(cu->curParser, "repeat define method %s in class %s.", signStr,
+                          cu->enclosingClassBK->name->value.start);
+        idx++;
+    }
+
+    //若是新定义就加入，这里并不是注册新方法，而是用索引来记录已经定义过的方法，用于以后排重
+    IntBufferAdd(cu->curParser->vm, methods, index);
+    return index;
+}
+
+//将方法methodIndex指代的方法装入classVar指代的class.methods中
+static void defineMethod(CompileUnit *cu, Variable classVar, bool isStatic, int methodIndex) {
+    //1. 将待绑定的方法在调用本函数之前已经放到栈顶了
+    //2. 将方法所属的类加载到栈顶
+    emitLoadVariable(cu, classVar);
+    //3. 生成OPCODE_STATIC_METHOD或者OPCODE_INSTANCE_METHOD
+    //在运行时绑定
+    OpCode opCode = isStatic ? OPCODE_STATIC_METHOD : OPCODE_INSTANCE_METHOD;
+    writeOpCodeShortOperand(cu, opCode, methodIndex);
 }
 
 //编译程序
