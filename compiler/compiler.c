@@ -1842,6 +1842,72 @@ static void compileClassBody(CompileUnit *cu, Variable classVar) {
         compileMethod(cu, classVar, false);
 }
 
+//编译类定义
+static void compileClassDefinition(CompileUnit *cu) {
+    Variable classVar;
+    if (cu->scopeDepth != -1) //目前只支持在模块作用域定义类
+        COMPILE_ERROR(cu->curParser, "class definition must be in the module scope.");
+
+    classVar.scopeType = VAR_SCOPE_MODULE;
+    consumeCurToken(cu->curParser, TOKEN_ID, "keyword class should follow by class name."); //读入类名
+    classVar.index = declareVariable(cu, cu->curParser->preToken.start, cu->curParser->preToken.length);
+
+    //生成类名，用于创建类
+    ObjString *className = newObjString(cu->curParser->vm, cu->curParser->preToken.start,
+                                        cu->curParser->preToken.length);
+
+    //生成加载类名的指令
+    emitLoadConstant(cu, OBJ_TO_VALUE(className));
+    if (matchToken(cu->curParser, TOKEN_LESS)) //类继承
+        expression(cu, BP_CALL); //把父类名加载到栈顶
+    else //默认加载object类为基类
+        emitLoadModuleVar(cu, "object");
+
+    //创建类需要知道域的个数，目前类未定义完成，因此域的个数未知，因此先临时写为255，待类编译完成后再回填属性数
+    int fieldNumIndex = writeOpCodeByteOperand(cu, OPCODE_CREATE_CLASS, 255);
+
+    //虚拟机执行完OPCODE_CREATE_CLASS后，栈顶留下了创建好的类，因此现在可以用该类为之前声明的类名className赋值
+    if (cu->scopeDepth == -1)
+        emitStoreModuleVar(cu, classVar.index);
+
+    ClassBookKeep classBK;
+    classBK.name = className;
+    classBK.inStatic = false; //默认为false
+    StringBufferInit(&classBK.fields);
+    IntBufferInit(&classBK.instantMethods);
+    IntBufferInit(&classBK.staticMethods);
+
+    //此时cu是模块的编译单元，跟踪当前编译的类
+    cu->enclosingClassBK = &classBK;
+
+    //读入类名后的{
+    consumeCurToken(cu->curParser, TOKEN_LEFT_BRACE, "expect '{' after class name in the clas declaretion.");
+
+    //进入类体
+    enterScope(cu);
+
+    //直到类定义结束}为止
+    while (!matchToken(cu->curParser, TOKEN_RIGHT_BRACE)) {
+        compileClassBody(cu, classVar);
+        if (PEEK_TOKEN(cu->curParser) == TOKEN_EOF)
+            COMPILE_ERROR(cu->curParser, "expect '}' at the end of class declaration.");
+    }
+
+    //上面临时写了255个字段，现在类编译完成，回填正确的字段数
+    //classBK.fields是由compileVarDefinition函数统计的
+    cu->fun->instrStream.datas[fieldNumIndex] = classBK.fields.count;
+
+    symbolTableClear(cu->curParser->vm, &classBK.fields);
+    IntBufferClear(cu->curParser->vm, &classBK.instantMethods);
+    IntBufferClear(cu->curParser->vm, &classBK.staticMethods);
+
+    //enclosingClassBK用来表示是否在编译类，编译完类后要置空，编译下一个类时再重新赋值
+    cu->enclosingClassBK = NULL;
+
+    //退出作用域，丢弃相关局部变量
+    leaveScope(cu);
+}
+
 //编译程序
 static void compileProgram(CompileUnit *cu) {
     ;
