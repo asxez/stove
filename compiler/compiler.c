@@ -1968,6 +1968,74 @@ static void compileFunctionDefinition(CompileUnit *cu) {
     defineVariable(cu, funNameIndex);
 }
 
+//编译import导入
+static void compileImport(CompileUnit *cu) {
+    /*
+     * import "foo"
+     * 则为：
+     * System.importModule("foo")
+     *
+     * import foo for test1, test2
+     * 则为：
+     * var test1 = System.getModuleVariable("foo", "test1")
+     * var test2 = System.getModuleVariable("foo", "test2")
+     * */
+
+    consumeCurToken(cu->curParser, TOKEN_ID, "expect module name after export.");
+
+    //备份模块名token
+    Token moduleNameToken = cu->curParser->preToken;
+
+    //导入时模块的扩展名不需要，有可能用户会把模块的扩展名加上，比如import stove.stv，这时候就要跳过扩展名
+    if (cu->curParser->preToken.start[cu->curParser->preToken.length] == '.') {
+        printf("\nwarning: the imported module needn't extension.");
+        getNextToken(cu->curParser);
+        getNextToken(cu->curParser);
+    }
+
+    //把模块名转为字符串，存储为常量
+    ObjString *moduleName = newObjString(cu->curParser->vm, moduleNameToken.start, moduleNameToken.length);
+    uint32_t constModIdx = addConstant(cu, OBJ_TO_VALUE(moduleName));
+
+    //1. 为调用System.importModule("foo")压入参数System
+    emitLoadModuleVar(cu, "System");
+    //2. 为调用System.importModule("foo")压入参数"foo"
+    writeOpCodeShortOperand(cu, OPCODE_LOAD_CONSTANT, constModIdx);
+    //3. 现在可以调用System.importModule("foo")
+    emitCall(cu, 1, "importModule(_)", 15);
+
+    //回收返回值args[0]所在的空间
+    writeOpCode(cu, OPCODE_POP);
+
+    //如果后面没有关键字for就导入结束
+    if (!matchToken(cu->curParser, TOKEN_FOR))
+        return;
+
+    //循环编译导入的模块变量，import foo for test1, test2
+    do {
+        consumeCurToken(cu->curParser, TOKEN_ID, "expect variable name after 'for' when import.");
+        //在本模块中声明导入的模块变量
+        uint32_t varIdx = declareVariable(cu, cu->curParser->preToken.start, cu->curParser->preToken.length);
+
+        //把模块变量转为字符串，存储为常量
+        ObjString *constVarName = newObjString(cu->curParser->vm, cu->curParser->preToken.start,
+                                               cu->curParser->preToken.length);
+        uint32_t constVarIdx = addConstant(cu, OBJ_TO_VALUE(constVarName));
+
+        //1. 为调用System.getModuleVariable("foo", "test1")压入System
+        emitLoadModuleVar(cu, "System");
+        //2. 为调用System.getModuleVariable("foo", "test1")压入"foo"
+        writeOpCodeShortOperand(cu, OPCODE_LOAD_CONSTANT, constModIdx);
+        //3. 为调用System.getModuleVariable("foo", "test1")压入"test1"
+        writeOpCodeShortOperand(cu, OPCODE_LOAD_CONSTANT, constVarIdx);
+        //4. 调用System.getModuleVariable("foo", "test1")
+        emitCall(cu, 2, "getModuleVariable(_,_)", 22);
+
+        //此时栈顶是System.getModuleVariable("foo", "test1")的返回值，即导入的模块变量的值，下面将其同步到相应变量中
+        defineVariable(cu, varIdx);
+    } while (matchToken(cu->curParser, TOKEN_COMMA));
+}
+
 //编译程序
 static void compileProgram(CompileUnit *cu) {
     ;
