@@ -1909,7 +1909,7 @@ static void compileClassDefinition(CompileUnit *cu) {
 }
 
 //编译函数定义
-static void compileFunctionDefition(CompileUnit *cu) {
+static void compileFunctionDefinition(CompileUnit *cu) {
     /*
      * 1. 函数定义的形式：
      * var function = Fun.new {|形参|
