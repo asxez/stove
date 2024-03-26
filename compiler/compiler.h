@@ -70,6 +70,7 @@ typedef struct {
 
 typedef struct compileUnit CompileUnit;
 
+uint32_t getBytesOfOperands(Byte *instrStream, Value *constants, int ip);
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value);
 ObjFun *compileModule(VM *vm, ObjModule *objModule, const char *moduleCode);
 
