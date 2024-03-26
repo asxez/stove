@@ -8,6 +8,7 @@
 #include "obj_range.h"
 #include "../../vm/core.h"
 #include "../../vm/vm.h"
+#include "../../compiler/compiler.h"
 
 DEFINE_BUFFER_METHOD(Method)
 
@@ -52,6 +53,34 @@ Class *newRawClass(VM *vm, const char *name, uint32_t fieldNum) {
     class->fieldNum = fieldNum;
     class->superClass = NULL; //裸类无基类
     MethodBufferInit(&class->methods);
+    return class;
+}
+
+//创建一个类
+Class *newClass(VM *vm, ObjString *className, uint32_t fieldNum, Class *superClass) {
+    //10表示strlen(" metaClass")
+#define MAX_METACLASS_LEN (MAX_ID_LEN + 10)
+    char newClassName[MAX_METACLASS_LEN] = {EOS};
+#undef MAX_METACLASS_LEN
+
+    memcpy(newClassName, className->value.start, className->value.length);
+    memcpy(newClassName + className->value.length, " metaClass", 10);
+
+    //先创建子类的meta类
+    Class *metaClass = newRawClass(vm, newClassName, 0);
+    metaClass->objHeader.class = vm->classOfClass;
+
+    //绑定classOfClass为meta类的基类，所有类的meta类的基类都是classOfClass
+    bindSuperClass(vm, metaClass, vm->classOfClass);
+
+    //最后创建类
+    memcpy(newClassName, className->value.start, className->value.length);
+    newClassName[className->value.length] = EOS;
+    Class *class = newRawClass(vm, newClassName, fieldNum);
+
+    className->objHeader.class = metaClass;
+    bindSuperClass(vm, class, superClass);
+
     return class;
 }
 

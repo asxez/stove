@@ -7,7 +7,6 @@
 #include <sys/stat.h>
 #include "../utils/utils.h"
 #include "vm.h"
-#include "../objectAndClass/include/class.h"
 #include "../compiler/compiler.h"
 #include "../objectAndClass/include/obj_thread.h"
 #include "coreScript.inc"
