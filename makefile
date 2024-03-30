@@ -1,9 +1,9 @@
 CC = gcc
 #CFLAGS = -g -DDEBUG -lm -Wall -I include -I cli -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
-CFLAGS = -g -lm -Wall -I lexicalParser/include -I cli -I objectAndClass/include -I utils -I vm -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
+CFLAGS = -g -lm -Wall -I lexicalParser/include -I cli -I compiler -I objectAndClass/include -I utils -I vm -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
 
 TARGET = stove
-DIRS = lexicalParser/include cli objectAndClass/include utils vm
+DIRS = lexicalParser/include cli objectAndClass/include utils vm compiler
 CFILES = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.c))
 OBJS = $(patsubst %.c,%.o,$(CFILES))
 

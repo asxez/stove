@@ -43,5 +43,6 @@ struct vm {
 
 void initVM(VM *vm);
 VM *newVM(void);
+VMResult executeInstruction(VM *vm, register ObjThread *curThread);
 
 #endif //STOVE_VM_H

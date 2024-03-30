@@ -22,20 +22,7 @@ static void runFile(const char *path) {
 
     VM *vm = newVM();
     const char *sourceCode = readFile(path);
-
     executeModule(vm, OBJ_TO_VALUE(newObjString(vm, path, strlen(path))), sourceCode);
-
-    struct parser parser;
-    initParser(vm, &parser, path, sourceCode, NULL);
-
-    while (parser.curToken.tokenType != TOKEN_EOF) {
-        getNextToken(&parser);
-        printf("%dL : %s [", parser.curToken.lineNo, tokenArray[parser.curToken.tokenType]);
-        uint32_t idx = 0;
-        while (idx < parser.curToken.length)
-            printf("%c", *(parser.curToken.start + idx++));
-        printf("]\n");
-    }
 }
 
 int main(int argc, const char **argv) {

@@ -256,7 +256,7 @@ void bindSuperClass(VM *vm, Class *subClass, Class *superClass) {
 // 执行模块
 VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
     ObjThread *objThread = loadModule(vm, moduleName, moduleCode);
-    return VM_RESULT_ERROR;
+    return executeInstruction(vm, objThread);
 }
 
 // 编译核心模块
