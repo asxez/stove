@@ -76,6 +76,17 @@ char *readFile(const char *path) {
     return fileContent;
 }
 
+//返回核心模块name的value结构
+static Value getCoreClassValue(ObjModule *objModule, const char *name) {
+    int index = getIndexFromSymbolTable(&objModule->moduleVarName, name, strlen(name));
+    if (index == -1) {
+        char id[MAX_ID_LEN] = {EOS};
+        memcpy(id, name, strlen(name));
+        RUN_ERROR("something wrong occur: missing core class \"%s\".", id);
+    }
+    return objModule->moduleVarValue.datas[index];
+}
+
 // !object: object取反，结果为false
 static bool primObjectNot(VM *vm UNUSED, Value *args) {
     RET_VALUE(VT_TO_VALUE(VT_FALSE))
@@ -149,6 +160,21 @@ static bool primClassToString(VM *vm UNUSED, Value *args) {
 static bool primObjectMetaSame(VM *vm UNUSED, Value *args) {
     Value boolValue = BOOL_TO_VALUE(valueIsEqual(args[1], args[2]));
     RET_VALUE(boolValue)
+}
+
+//返回bool的字符串形式，true或false
+static bool primBoolToString(VM *vm, Value *args) {
+    ObjString *objString;
+    if (VALUE_TO_BOOL(args[0])) //若为VT_TRUE
+        objString = newObjString(vm, "true", 4);
+    else
+        objString = newObjString(vm, "false", 5);
+    RET_OBJ(objString);
+}
+
+//bool值取反
+static bool primBoolNot(VM *vm UNUSED, Value *args) {
+    RET_BOOL(!VALUE_TO_BOOL(args[0]));
 }
 
 //从modules中获取名为moduleName的模块
@@ -297,4 +323,9 @@ void buildCore(VM *vm) {
 
     //执行核心模块
     executeModule(vm, CORE_MODULE, coreModuleCode);
+
+    //Bool类定义在coreScript.inc文件中，将其挂载Bool类到vm->boolClass
+    vm->boolClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Bool"));
+    PRIM_METHOD_BIND(vm->boolClass, "toString", primBoolToString)
+    PRIM_METHOD_BIND(vm->boolClass, "!", primBoolNot)
 }
