@@ -8,6 +8,7 @@
 #include "../utils/common.h"
 #include "../objectAndClass/include/header_obj.h"
 #include "../objectAndClass/include/obj_map.h"
+#include "../objectAndClass/include/obj_thread.h"
 
 #define OPCODE_SLOTS(opcode, effect) OPCODE_##opcode,
 typedef enum {
@@ -36,6 +37,7 @@ struct vm {
     ObjHeader *allObjects; //所有已分配对象链表
     SymbolTable allMethodNames; //所有类的方法名
     ObjMap *allModules;
+    ObjThread *curThread;
     Parser *curParser; //当前词法分析器
 };
 

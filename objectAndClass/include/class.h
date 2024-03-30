@@ -97,6 +97,7 @@ typedef union {
 
 bool valueIsEqual(Value a, Value b);
 Class *newRawClass(VM *vm, const char *name, uint32_t fieldNum);
+Class *newClass(VM *vm, ObjString *className, uint32_t fieldNum, Class *superClass);
 Class *getClassOfObj(VM *vm, Value object);
 
 #endif // STOVE_CLASS_H
