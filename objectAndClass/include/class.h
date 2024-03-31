@@ -42,10 +42,10 @@ typedef enum {
 #define VALUE_TO_OBJRANGE(value) ((ObjRange *) VALUE_TO_OBJ(value))
 #define VALUE_TO_OBJINSTANCE(value) ((ObjInstance *) VALUE_TO_OBJ(value))
 #define VALUE_TO_OBJLIST(value) ((ObjList *) VALUE_TO_OBJ(value))
-#define VALUE_TO_OBJMAP(value) (())
+#define VALUE_TO_OBJMAP(value) ((ObjMap *) VALUE_TO_OBJ(value))
 #define VALUE_TO_OBJCLOSURE(value) ((ObjClosure *) VALUE_TO_OBJ(value))
 #define VALUE_TO_CLASS(value) ((Class *) VALUE_TO_OBJ(value))
-#define VALUE_TO_OBJTHREAD(value) (())
+#define VALUE_TO_OBJTHREAD(value) ((ObjThread *) VALUE_TO_OBJ(value))
 #define VALUE_TO_OBJMODULE(value) ((ObjModule *) VALUE_TO_OBJ(value))
 
 #define VALUE_IS_UNDEFINED(value) ((value).type == VT_UNDEFINED)
