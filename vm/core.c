@@ -304,6 +304,17 @@ static bool primFunNew(VM *vm, Value *args) {
     RET_VALUE(args[1])
 }
 
+//null取非
+static bool primNullNot(VM *vm UNUSED, Value *args UNUSED) {
+    RET_VALUE(BOOL_TO_VALUE(true))
+}
+
+//null的字符串化
+static bool primNullToString(VM *vm, Value *args UNUSED) {
+    ObjString *objString = newObjString(vm, "null", 4);
+    RET_OBJ(objString)
+}
+
 //从modules中获取名为moduleName的模块
 static ObjModule *getModule(VM *vm, Value moduleName) {
     Value value = mapGet(vm->allModules, moduleName);
@@ -499,4 +510,9 @@ void buildCore(VM *vm) {
     bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_)");
     bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)");
     bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)");
+
+    //绑定Null类的方法
+    vm->nullClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Null"));
+    PRIM_METHOD_BIND(vm->nullClass, "!", primNullNot)
+    PRIM_METHOD_BIND(vm->nullClass, "toString", primNullToString)
 }
