@@ -295,6 +295,15 @@ static bool primThreadIsDone(VM *vm UNUSED, Value *args) {
     RET_BOOL(objThread->usedFrameNum == 0 || !VALUE_IS_NULL(objThread->errorObj))
 }
 
+//Fun.new(_)：新建一个函数对象
+static bool primFunNew(VM *vm, Value *args) {
+    //代码块为参数必为闭包
+    if (!validateFun(vm, args[1]))
+        return false;
+    //直接返回函数闭包
+    RET_VALUE(args[1])
+}
+
 //从modules中获取名为moduleName的模块
 static ObjModule *getModule(VM *vm, Value moduleName) {
     Value value = mapGet(vm->allModules, moduleName);
@@ -397,6 +406,14 @@ void bindSuperClass(VM *vm, Class *subClass, Class *superClass) {
     }
 }
 
+//绑定fun.call的重载
+static void bindFunOverloadCall(VM *vm, const char *sign) {
+    uint32_t index = ensureSymbolExist(vm, &vm->allMethodNames, sign, strlen(sign));
+    //构造method
+    Method method = {MT_FUN_CALL, {0}};
+    bindMethod(vm, vm->funClass, index, method);
+}
+
 // 执行模块
 VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
     ObjThread *objThread = loadModule(vm, moduleName, moduleCode);
@@ -460,4 +477,26 @@ void buildCore(VM *vm) {
     PRIM_METHOD_BIND(vm->threadClass, "call()", primThreadCallWithoutArg)
     PRIM_METHOD_BIND(vm->threadClass, "call(_)", primThreadCallWithArg)
     PRIM_METHOD_BIND(vm->threadClass, "isDone", primThreadIsDone)
+
+    //绑定函数类
+    vm->funClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Fun"));
+    PRIM_METHOD_BIND(vm->funClass->objHeader.class, "new(_)", primFunNew)
+    //绑定call的重载方法
+    bindFunOverloadCall(vm, "call()");
+    bindFunOverloadCall(vm, "call(_)");
+    bindFunOverloadCall(vm, "call(_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)");
+    bindFunOverloadCall(vm, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)");
 }
