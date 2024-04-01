@@ -2,7 +2,7 @@ static const char* coreModuleCode =
 "class Null {}\n"
 "class Bool {}\n"
 "class Num {}\n"
-"class Fn {}\n"
+"class Fun {}\n"
 "class Thread {}\n"
 "\n"
 "class Sequence {\n"

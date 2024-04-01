@@ -243,8 +243,7 @@ static bool primThreadYieldWithoutArg(VM *vm, Value *args UNUSED) {
     curThread->caller = NULL; //与调用者断开联系
 
     if (vm->curThread != NULL)
-        //为保持通用的栈结构，如果当前线程有主调方
-        //就将空值作为返回值放在主调方的栈顶
+        //为保持通用的栈结构，如果当前线程有主调方，就将空值作为返回值放在主调方的栈顶
         vm->curThread->esp[-1] = VT_TO_VALUE(VT_NULL);
     return false;
 }
@@ -270,7 +269,7 @@ static bool switchThread(VM *vm, ObjThread *nextThread, Value *args, bool withAr
     ASSERT(nextThread->esp > nextThread->stack, "esp should be greater than stack.");
     //nextThread.call(arg)中的arg作为nextThread.yield的返回值
     //存储到nextThread的栈顶，否则压入null保持平衡
-    nextThread->esp[-1] = withArg ? args[-1] : VT_TO_VALUE(VT_NULL);
+    nextThread->esp[-1] = withArg ? args[1] : VT_TO_VALUE(VT_NULL);
 
     //使当前线程指向nextThread，使之就绪
     vm->curThread = nextThread;
