@@ -5,11 +5,11 @@
 #include "core.h"
 #include <string.h>
 #include <sys/stat.h>
-#include "../utils/utils.h"
+#include <math.h>
 #include "vm.h"
 #include "../compiler/compiler.h"
-#include "../objectAndClass/include/obj_thread.h"
 #include "coreScript.inc"
+#include <ctype.h>
 
 char *rootDir = NULL; // 根目录
 
@@ -93,6 +93,35 @@ static Value getCoreClassValue(ObjModule *objModule, const char *name) {
         RUN_ERROR("something wrong occur: missing core class \"%s\".", id);
     }
     return objModule->moduleVarValue.datas[index];
+}
+
+//将数字转换为字符串
+static ObjString *numToStr(VM *vm, double num) {
+    if (num != num)
+        return newObjString(vm, "nan", 3);
+    if (num == INFINITY)
+        return newObjString(vm, "infinity", 8);
+    if (num == -INFINITY)
+        return newObjString(vm, "-infinity", 9);
+
+    //以下是24字节的缓冲区足以容纳双精度到字符串的转换
+    char buf[24] = {EOS};
+    int len = sprintf(buf, "%.14g", num);
+    return newObjString(vm, buf, len);
+}
+
+//判断arg是否是数字
+static bool validateNum(VM *vm, Value arg) {
+    if (VALUE_IS_NUM(arg))
+        return true;
+    SET_ERROR_FALSE(vm, "argument must be number.");
+}
+
+//判断arg是否是字符串
+static bool validateString(VM *vm, Value arg) {
+    if (VALUE_IS_OBJSTR(arg))
+        return true;
+    SET_ERROR_FALSE(vm, "argument must be string.");
 }
 
 // !object: object取反，结果为false
@@ -315,6 +344,194 @@ static bool primNullToString(VM *vm, Value *args UNUSED) {
     RET_OBJ(objString)
 }
 
+//将字符串转换为数字
+static bool primStringToNum(VM *vm, Value *args) {
+    if (!validateString(vm, args[1]))
+        return false;
+
+    ObjString *objString = VALUE_TO_OBJSTR(args[1]);
+
+    //空字符串返回RETURN_NULL
+    if (objString->value.length == 0)
+        RET_NULL
+
+    ASSERT(objString->value.start[objString->value.length] == EOS, "objString don't terminate.");
+    errno = 0;
+    char *endPtr;
+    //将字符串转换成double型，它会自动跳过前面的空白
+    double num = strtod(objString->value.start, &endPtr);
+
+    //以endPtr是否等于start+length来判断不能转换的字符之后是否全是空白
+    while (*endPtr != EOS && isspace((unsigned char) *endPtr))
+        endPtr++;
+
+    if (errno == ERANGE)
+        RUN_ERROR("string too large.");
+    //如果字符串中不能转换的字符不全是空白，字符串非法，返回NULL
+    if (endPtr < objString->value.start + objString->value.length)
+        RET_NULL
+    //至此，检查通过
+    RET_NUM(num)
+}
+
+//圆周率
+static bool primNumPi(VM *vm UNUSED, Value *args UNUSED) {
+    RET_NUM(3.14159265358979323846)
+}
+
+#define PRIM_NUM_INFIX(name, operator, type) \
+    static bool name(VM *vm, Value *args) {  \
+        if (!validateNum(vm, args[1]))       \
+            return false;                    \
+        RET_##type(VALUE_TO_NUM(args[0]) operator VALUE_TO_NUM(args[1])); \
+    }
+
+PRIM_NUM_INFIX(primNumPlus, +, NUM)
+
+PRIM_NUM_INFIX(primNumMinus, -, NUM)
+
+PRIM_NUM_INFIX(primNumMul, *, NUM)
+
+PRIM_NUM_INFIX(primNumDiv, /, NUM)
+
+PRIM_NUM_INFIX(primNumMt, >, BOOL)
+
+PRIM_NUM_INFIX(primNumMe, >=, BOOL)
+
+PRIM_NUM_INFIX(primNumLt, <, BOOL)
+
+PRIM_NUM_INFIX(primNumLe, <=, BOOL)
+
+#undef PRIM_NUM_INFIX
+
+#define PRIM_NUM_BIT(name, operator) \
+    static bool name(VM *vm UNUSED, Value *args) { \
+        if (!validateNum(vm, args[1]))            \
+            return false;            \
+        uint32_t leftOperand = VALUE_TO_NUM(args[0]); \
+        uint32_t rightOperand = VALUE_TO_NUM(args[1]);\
+        RET_NUM(leftOperand operator rightOperand);\
+    }
+
+PRIM_NUM_BIT(primNumBitAnd, &)
+
+PRIM_NUM_BIT(primNumBitOr, |)
+
+PRIM_NUM_BIT(primNumBitShiftRight, >>)
+
+PRIM_NUM_BIT(primNumBitShiftLeft, <<)
+
+#undef PRIM_NUM_BIT
+
+//使用数学库函数
+#define PRIM_NUM_MATH(name, mathFun) \
+    static bool name(VM *vm UNUSED, Value *args) { \
+        RET_NUM(mathFun(VALUE_TO_NUM(args[0])));   \
+    }
+
+PRIM_NUM_MATH(primNumAbs, fabs)
+
+PRIM_NUM_MATH(primNumAcos, acos)
+
+PRIM_NUM_MATH(primNumAsin, asin)
+
+PRIM_NUM_MATH(primNumAtan, atan)
+
+PRIM_NUM_MATH(primNumCeil, ceil)
+
+PRIM_NUM_MATH(primNumSin, sin)
+
+PRIM_NUM_MATH(primNumCos, cos)
+
+PRIM_NUM_MATH(primNumTan, tan)
+
+PRIM_NUM_MATH(primNumFloor, floor)
+
+PRIM_NUM_MATH(primNumNegate, -)
+
+PRIM_NUM_MATH(primNumSqrt, sqrt)
+
+#undef PRIM_NUM_MATH
+
+//这里用fmod实现浮点取模
+static bool primNumMod(VM *vm, Value *args) {
+    if (!validateNum(vm, args[1]))
+        return false;
+    RET_NUM(fmod(VALUE_TO_NUM(args[0]), VALUE_TO_NUM(args[1])))
+}
+
+//数字取反
+static bool primNumBitNot(VM *vm UNUSED, Value *args) {
+    RET_NUM(~(uint32_t) VALUE_TO_NUM(args[0]))
+}
+
+//[数字from..数字to]
+static bool primNumRange(VM *vm, Value *args) {
+    if (!validateNum(vm, args[1]))
+        return false;
+    double from = VALUE_TO_NUM(args[0]);
+    double to = VALUE_TO_NUM(args[1]);
+    RET_OBJ(newObjRange(vm, from, to))
+}
+
+//atan2(args[1])
+static bool primNumAtan2(VM *vm, Value *args) {
+    if (!validateNum(vm, args[1]))
+        return false;
+    RET_NUM(atan2(VALUE_TO_NUM(args[0]), VALUE_TO_NUM(args[1])))
+}
+
+//返回小数部分
+static bool primNumFraction(VM *vm UNUSED, Value *args) {
+    double dummyInteger;
+    RET_NUM(modf(VALUE_TO_NUM(args[0]), &dummyInteger))
+}
+
+//判断数字是否无穷大，不区分正负无穷大
+static bool primNumIsInfinity(VM *vm UNUSED, Value *args) {
+    RET_BOOL(isinf(VALUE_TO_NUM(args[0])))
+}
+
+//判断是否为数字
+static bool primNumIsInteger(VM *vm UNUSED, Value *args) {
+    double num = VALUE_TO_NUM(args[0]);
+    //如果是nan或无限大的数字就返回false
+    if (isnan(num) || isinf(num))
+        RET_FALSE
+    RET_BOOL(trunc(num) == num)
+}
+
+//判断数字是否为nan
+static bool primNumIsNan(VM *vm UNUSED, Value *args) {
+    RET_BOOL(isnan(VALUE_TO_NUM(args[0])))
+}
+
+//数字转换为字符串
+static bool primNumToString(VM *vm, Value *args) {
+    RET_OBJ(numToStr(vm, VALUE_TO_NUM(args[0])))
+}
+
+//取数字的整数部分
+static bool primNumTruncate(VM *vm UNUSED, Value *args) {
+    double integer;
+    modf(VALUE_TO_NUM(args[0]), &integer);
+    RET_NUM(integer)
+}
+
+//判断两个数字是否相等
+static bool primNumEqual(VM *vm, Value *args) {
+    if (!validateNum(vm, args[1]))
+        RET_FALSE
+    RET_BOOL(VALUE_TO_NUM(args[0]) == VALUE_TO_NUM(args[1]))
+}
+
+//判断两个数字是否不相等
+static bool primNumNotEqual(VM *vm, Value *args) {
+    if (!validateNum(vm, args[1]))
+        RET_TRUE
+    RET_BOOL(VALUE_TO_NUM(args[0]) != VALUE_TO_NUM(args[1]))
+}
+
 //从modules中获取名为moduleName的模块
 static ObjModule *getModule(VM *vm, Value moduleName) {
     Value value = mapGet(vm->allModules, moduleName);
@@ -515,4 +732,51 @@ void buildCore(VM *vm) {
     vm->nullClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Null"));
     PRIM_METHOD_BIND(vm->nullClass, "!", primNullNot)
     PRIM_METHOD_BIND(vm->nullClass, "toString", primNullToString)
+
+    //绑定Num类的方法
+    vm->numClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Num"));
+    //类方法
+    PRIM_METHOD_BIND(vm->numClass->objHeader.class, "fromString(_)", primStringToNum)
+    PRIM_METHOD_BIND(vm->numClass->objHeader.class, "pi", primNumPi)
+    //实例方法
+    PRIM_METHOD_BIND(vm->numClass, "+(_)", primNumPlus)
+    PRIM_METHOD_BIND(vm->numClass, "-(_)", primNumMinus)
+    PRIM_METHOD_BIND(vm->numClass, "*(_)", primNumMul)
+    PRIM_METHOD_BIND(vm->numClass, "/(_)", primNumDiv)
+    PRIM_METHOD_BIND(vm->numClass, ">(_)", primNumMt)
+    PRIM_METHOD_BIND(vm->numClass, ">=(_)", primNumMe)
+    PRIM_METHOD_BIND(vm->numClass, "<(_)", primNumLt)
+    PRIM_METHOD_BIND(vm->numClass, "<=(_)", primNumLe)
+
+    //位运算
+    PRIM_METHOD_BIND(vm->numClass, "&(_)", primNumBitAnd)
+    PRIM_METHOD_BIND(vm->numClass, "|(_)", primNumBitOr)
+    PRIM_METHOD_BIND(vm->numClass, ">>(_)", primNumBitShiftRight)
+    PRIM_METHOD_BIND(vm->numClass, "<<(_)", primNumBitShiftLeft)
+
+    //下面大多数方法是通过rules中.对应的led(callEntry)来解析
+    //少数符号依然是INFIX_OPERATOR解析
+    PRIM_METHOD_BIND(vm->numClass, "abs", primNumAbs)
+    PRIM_METHOD_BIND(vm->numClass, "acos", primNumAcos)
+    PRIM_METHOD_BIND(vm->numClass, "asin", primNumAsin)
+    PRIM_METHOD_BIND(vm->numClass, "atan", primNumAtan)
+    PRIM_METHOD_BIND(vm->numClass, "ceil", primNumCeil)
+    PRIM_METHOD_BIND(vm->numClass, "cos", primNumCos)
+    PRIM_METHOD_BIND(vm->numClass, "sin", primNumSin)
+    PRIM_METHOD_BIND(vm->numClass, "tan", primNumTan)
+    PRIM_METHOD_BIND(vm->numClass, "floor", primNumFloor)
+    PRIM_METHOD_BIND(vm->numClass, "-", primNumNegate)
+    PRIM_METHOD_BIND(vm->numClass, "sqrt", primNumSqrt)
+    PRIM_METHOD_BIND(vm->numClass, "%(_)", primNumMod)
+    PRIM_METHOD_BIND(vm->numClass, "~", primNumBitNot)
+    PRIM_METHOD_BIND(vm->numClass, "..(_)", primNumRange)
+    PRIM_METHOD_BIND(vm->numClass, "atan(_)", primNumAtan2)
+    PRIM_METHOD_BIND(vm->numClass, "fraction", primNumFraction)
+    PRIM_METHOD_BIND(vm->numClass, "isInfinity", primNumIsInfinity)
+    PRIM_METHOD_BIND(vm->numClass, "isInteger", primNumIsInteger)
+    PRIM_METHOD_BIND(vm->numClass, "isNan", primNumIsNan)
+    PRIM_METHOD_BIND(vm->numClass, "toString", primNumToString)
+    PRIM_METHOD_BIND(vm->numClass, "truncate", primNumTruncate)
+    PRIM_METHOD_BIND(vm->numClass, "==(_)", primNumEqual)
+    PRIM_METHOD_BIND(vm->numClass, "!=(_)", primNumNotEqual)
 }
