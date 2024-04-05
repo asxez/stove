@@ -1,32 +1,18 @@
-#include <stdio.h>
-
+//typedef struct {
+//    uint32_t length;
+//    char start[0];
+//} CharValue; // 字符串缓冲区
+//
+//typedef struct {
+//    uint32_t hashCode; //字符串的哈希值
+//    CharValue value;
+//} ObjString;
+//
+//static int findString(ObjString *haystack, ObjString *needle);
+#include "stdio.h"
+#include "stdint.h"
 int main() {
-    FILE *file;
-    char buffer[100];  // 用于存储读取的内容
-
-    // 打开文件
-    file = fopen("F:\\WorkSpace\\c-case\\stove\\test.🐔", "rb");
-
-    if (file == NULL) {
-        perror("Error opening file");
-        return 1;
-    }
-
-    // 读取文件内容
-    size_t bytesRead;
-    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-        // 在这里可以对读取的内容进行处理，比如输出到屏幕
-        fwrite(buffer, 1, bytesRead, stdout);
-    }
-
-    if (ferror(file)) {
-        perror("Error reading file");
-        fclose(file);
-        return 1;
-    }
-
-    // 关闭文件
-    fclose(file);
-
+    int a = (uint32_t)'c';
+    printf("%d", a);
     return 0;
 }
