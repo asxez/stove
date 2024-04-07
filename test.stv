@@ -1,1 +1,2 @@
-System.print(1)
+var a = "aaa"
+System.print(a)

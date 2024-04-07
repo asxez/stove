@@ -6,7 +6,6 @@
 #include "../lexicalParser/include/parser.h"
 #include "../vm/core.h"
 #include <string.h>
-#include "../objectAndClass/include/class.h"
 
 #if DEBUG
 #include "debug.h"
@@ -1221,7 +1220,7 @@ SymbolBindRule Rules[] = {
         INFIX_SYMBOL(BP_CALL, callEntry), //TOKEN_DOT
         INFIX_OPERATOR("..", BP_RANGE), //TOKEN_DOT_DOT
         INFIX_OPERATOR("+", BP_TERM), //TOKEN_ADD
-        INFIX_OPERATOR("-", BP_TERM), //TOKEN_SUB
+        MIX_OPERATOR("-"), //TOKEN_SUB
         INFIX_OPERATOR("*", BP_FACTOR), //TOKEN_MUL
         INFIX_OPERATOR("/", BP_FACTOR), //TOKEN_DIV
         INFIX_OPERATOR("%", BP_FACTOR), //TOKEN_MOD
@@ -1515,7 +1514,7 @@ uint32_t getBytesOfOperands(Byte *instrStream, Value *constants, int ip) {
             return 2 + (VALUE_TO_OBJFUN(constants[funIdx]))->upvalueNum * 2;
         }
         default:
-            NOT_REACHED();
+            NOT_REACHED()
     }
 }
 

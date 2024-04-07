@@ -1,7 +1,7 @@
 #include "common.h"
 #include "utils.h"
 #include "../vm/vm.h"
-#include "parser.h"
+#include "../lexicalParser/include/parser.h"
 #include <stdlib.h>
 #include <stdarg.h>
 
@@ -66,7 +66,7 @@ void errorReport(void *parser, ErrorType errorType, const char *fmt, ...) {
             fprintf(stderr, "%s\n", buffer);
             break;
         default:
-            NOT_REACHED();
+            NOT_REACHED()
     }
     exit(EXIT_FAILURE);
 }

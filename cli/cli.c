@@ -2,12 +2,9 @@
 // Created by asxe on 2024/1/31.
 //
 
-#include <stdio.h>
 #include <string.h>
 #include "../lexicalParser/include/parser.h"
-#include "../vm/vm.h"
 #include "../vm/core.h"
-#include "../objectAndClass/include/class.h"
 
 //执行脚本文件
 static void runFile(const char *path) {
@@ -20,6 +17,7 @@ static void runFile(const char *path) {
     }
 
     VM *vm = newVM();
+    printf("bbb");
     const char *sourceCode = readFile(path);
     executeModule(vm, OBJ_TO_VALUE(newObjString(vm, path, strlen(path))), sourceCode);
 }

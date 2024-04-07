@@ -1,18 +1,54 @@
-//typedef struct {
-//    uint32_t length;
-//    char start[0];
-//} CharValue; // 字符串缓冲区
 //
-//typedef struct {
-//    uint32_t hashCode; //字符串的哈希值
-//    CharValue value;
-//} ObjString;
+// Created by asxe on 2024/1/31.
 //
-//static int findString(ObjString *haystack, ObjString *needle);
-#include "stdio.h"
-#include "stdint.h"
-#include "time.h"
-int main() {
-    printf("%f", (double)time(NULL));
+
+#include <string.h>
+#include "lexicalParser/include/parser.h"
+#include "vm/core.h"
+
+//执行脚本文件
+//static void runFile(const char *path) {
+//    const char *lastSlash = strrchr(path, '/');
+//    if (lastSlash != NULL) {
+//        char *root = (char *) malloc(lastSlash - path + 2);
+//        memcpy(root, path, lastSlash - path + 1);
+//        root[lastSlash - path + 1] = EOS;
+//        rootDir = root;
+//    }
+//
+//    VM *vm = newVM();
+//    printf("bbb");
+//    const char *sourceCode = readFile(path);
+//    executeModule(vm, OBJ_TO_VALUE(newObjString(vm, path, strlen(path))), sourceCode);
+//}
+
+int main(int argc, const char **argv) {
+//    if (argc == 1)
+//        ;
+//    else
+//        runFile(argv[1]);
+//    return 0;
+//    VM *vm = newVM();
+//    const char *sourceCode = "System.print(\"111\")";
+//    VMResult a = executeModule(vm, OBJ_TO_VALUE("test"), sourceCode);
+//    printf("%d", a);
+int test = 3;
+    start:
+    switch (test) {
+        case 0:
+        case 1:
+            printf("1");
+            goto start;
+        case 2:
+            printf("2");
+            goto start;
+
+            {
+                int b = 1;
+                printf("%d", b);
+                goto start;
+            }
+    }
+
     return 0;
 }

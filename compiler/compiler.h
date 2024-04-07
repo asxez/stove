@@ -15,7 +15,7 @@
 #define MAX_ARG_NUM 16
 
 //函数名长度+'('+n个参数+（n-1）个参数分隔符','+')'
-#define MAX_SIGN_LEN MAX_METHOD_NAME_LEN + MAX_ARG_NUM * 2 + 1
+#define MAX_SIGN_LEN (MAX_METHOD_NAME_LEN + MAX_ARG_NUM * 2 + 1)
 
 #define MAX_FIELD_NUM 128
 

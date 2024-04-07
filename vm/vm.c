@@ -4,7 +4,6 @@
 
 #include "vm.h"
 #include <stdlib.h>
-#include "../utils/utils.h"
 #include "core.h"
 #include "../compiler/compiler.h"
 
@@ -284,6 +283,7 @@ VMResult executeInstruction(VM *vm, register ObjThread *curThread) {
 #define LOOP() goto loopStart
 
     LOAD_CUR_FRAME()
+
 DECODE {
         //若OPCODE依赖于指令环境（栈和指令流），会在各OPCODE下说明
 
@@ -336,138 +336,130 @@ DECODE {
             PUSH(fun->constants.datas[READ_SHORT()]);
             LOOP();
 
-            {
-                int argNum, index;
-                Value *args;
-                Class *class;
-                Method *method;
-                CASE(CALL0):
-                CASE(CALL1):
-                CASE(CALL2):
-                CASE(CALL3):
-                CASE(CALL4):
-                CASE(CALL5):
-                CASE(CALL6):
-                CASE(CALL7):
-                CASE(CALL8):
-                CASE(CALL9):
-                CASE(CALL10):
-                CASE(CALL11):
-                CASE(CALL12):
-                CASE(CALL13):
-                CASE(CALL14):
-                CASE(CALL15):
-                CASE(CALL16):
-                    //指令流1：2字节的method索引
-                    //因为还有个隐式的receiver（就是下面的args[0]，所以参数个数+1）
-                    argNum = opCode - OPCODE_CALL0 + 1;
-                //读取两字节的数据（CALL指令的操作数），index是方法名的索引
-                index = READ_SHORT();
-                //为参数指针数组args赋值
-                args = curThread->esp - argNum;
-                //获得方法所在的类
-                class = getClassOfObj(vm, args[0]);
-                goto invokeMethod;
+        CASE(CALL0):
+        CASE(CALL1):
+        CASE(CALL2):
+        CASE(CALL3):
+        CASE(CALL4):
+        CASE(CALL5):
+        CASE(CALL6):
+        CASE(CALL7):
+        CASE(CALL8):
+        CASE(CALL9):
+        CASE(CALL10):
+        CASE(CALL11):
+        CASE(CALL12):
+        CASE(CALL13):
+        CASE(CALL14):
+        CASE(CALL15):
+        CASE(CALL16): {
+            int argNum, index;
+            Value *args;
+            Class *class;
+            Method *method;
 
-                CASE(SUPER0):
-                CASE(SUPER1):
-                CASE(SUPER2):
-                CASE(SUPER3):
-                CASE(SUPER4):
-                CASE(SUPER5):
-                CASE(SUPER6):
-                CASE(SUPER7):
-                CASE(SUPER8):
-                CASE(SUPER9):
-                CASE(SUPER10):
-                CASE(SUPER11):
-                CASE(SUPER12):
-                CASE(SUPER13):
-                CASE(SUPER14):
-                CASE(SUPER15):
-                CASE(SUPER16):
-                    //指令流1：2字节的method索引
-                    //指令流2：2字节的基类常量索引
+            //指令流1：2字节的method索引
+            //因为还有个隐式的receiver（就是下面的args[0]，所以参数个数+1）
+            argNum = opCode - OPCODE_CALL0 + 1;
+            //读取两字节的数据（CALL指令的操作数），index是方法名的索引
+            index = READ_SHORT();
+            //为参数指针数组args赋值
+            args = curThread->esp - argNum;
+            //获得方法所在的类
+            class = getClassOfObj(vm, args[0]);
+            goto invokeMethod;
 
-                    //因为还有个隐式的receiver（就是下面的args[0]），所以参数个数+1
-                    argNum = opCode - OPCODE_SUPER0 + 1;
-                index = READ_SHORT();
-                args = curThread->esp - argNum;
+            CASE(SUPER0):
+            CASE(SUPER1):
+            CASE(SUPER2):
+            CASE(SUPER3):
+            CASE(SUPER4):
+            CASE(SUPER5):
+            CASE(SUPER6):
+            CASE(SUPER7):
+            CASE(SUPER8):
+            CASE(SUPER9):
+            CASE(SUPER10):
+            CASE(SUPER11):
+            CASE(SUPER12):
+            CASE(SUPER13):
+            CASE(SUPER14):
+            CASE(SUPER15):
+            CASE(SUPER16):
+                //指令流1：2字节的method索引
+                //指令流2：2字节的基类常量索引
 
-                //在函数bindMethodAndPatch中实现的基类的绑定
-                class = VALUE_TO_CLASS(fun->constants.datas[READ_SHORT()]);
+                //因为还有个隐式的receiver（就是下面的args[0]），所以参数个数+1
+                argNum = opCode - OPCODE_SUPER0 + 1;
+            index = READ_SHORT();
+            args = curThread->esp - argNum;
 
-                invokeMethod:
-                if ((uint32_t) index > class->methods.count ||
-                    (method = &class->methods.datas[index])->methodType == MT_NONE)
-                    RUN_ERROR("method \"%s\" not found.", vm->allMethodNames.datas[index].str);
+            //在函数bindMethodAndPatch中实现的基类的绑定
+            class = VALUE_TO_CLASS(fun->constants.datas[READ_SHORT()]);
 
-                switch (method->methodType) {
-                    case MT_PRIMITIVE:
-                        //如果返回值为true，则vm进行空间回收的工作
-                        if (method->primFun(vm, args))
-                            //args[0]是返回值，argNum-1是保留args[0]，args[0]的空间最终由返回值的接收者即函数的主调方回收
-                            curThread->esp -= argNum - 1;
-                        else {
-                            /*
-                             * 如果返回false则说明有两种情况：
-                             * 1. 出错
-                             * 2. 切换了线程，此时vm->curThread已经被切换为新的线程
-                             * 保存线程的上下文环境，运行新线程之后还能回到当前老线程指令流的正确位置
-                            */
-                            STORE_CUR_FRAME();
+            invokeMethod:
+            if ((uint32_t) index > class->methods.count ||
+                (method = &class->methods.datas[index])->methodType == MT_NONE)
+                RUN_ERROR("method \"%s\" not found.", vm->allMethodNames.datas[index].str);
 
-                            //如果没有待执行的线程，说明执行完毕
-                            if (vm->curThread == NULL)
-                                return VM_RESULT_SUCCESS;
+            switch (method->methodType) {
+                case MT_PRIMITIVE:
+                    //如果返回值为true，则vm进行空间回收的工作
+                    if (method->primFun(vm, args))
+                        //args[0]是返回值，argNum-1是保留args[0]，args[0]的空间最终由返回值的接收者即函数的主调方回收
+                        curThread->esp -= argNum - 1;
+                    else {
+                        /*
+                         * 如果返回false则说明有两种情况：
+                         * 1. 出错
+                         * 2. 切换了线程，此时vm->curThread已经被切换为新的线程
+                         * 保存线程的上下文环境，运行新线程之后还能回到当前老线程指令流的正确位置
+                        */
+                        STORE_CUR_FRAME();
 
-                            //vm->curThread已经由返回false的函数置为下一个线程
-                            //切换到下一个线程的上下文
-                            curThread = vm->curThread;
-                            LOAD_CUR_FRAME()
-
-                            if (!VALUE_IS_NULL(curThread->errorObj)) {
-                                if (VALUE_IS_OBJSTR(curThread->errorObj)) {
-                                    ObjString *error = VALUE_TO_OBJSTR(curThread->errorObj);
-                                    printf("%s", error->value.start);
-                                }
-                                //出错后将返回值置为NULL，避免主调方获取到错误的结果
-                                PEEK() = VT_TO_VALUE(VT_NULL);
+                        if (!VALUE_IS_NULL(curThread->errorObj)) {
+                            if (VALUE_IS_OBJSTR(curThread->errorObj)) {
+                                ObjString *error = VALUE_TO_OBJSTR(curThread->errorObj);
+                                printf("%s", error->value.start);
                             }
-                            //如果没有待执行的线程，说明执行完毕
-                            if (vm->curThread == NULL)
-                                return VM_RESULT_SUCCESS;
-
-                            //vm->curThread已经由返回false的函数置为下一个线程
-                            //切换到下一个线程的上下文
-                            curThread = vm->curThread;
-                            LOAD_CUR_FRAME()
+                            //出错后将返回值置为NULL，避免主调方获取到错误的结果
+                            PEEK() = VT_TO_VALUE(VT_NULL);
                         }
-                        break;
 
-                    case MT_SCRIPT:
-                        STORE_CUR_FRAME();
-                        createFrame(vm, curThread, (ObjClosure *) method->obj, argNum);
-                        LOAD_CUR_FRAME() //加载最新的frame
-                        break;
+                        //如果没有待执行的线程，说明执行完毕
+                        if (vm->curThread == NULL)
+                            return VM_RESULT_SUCCESS;
 
-                    case MT_FUN_CALL:
-                        ASSERT(VALUE_IS_OBJCLOSURE(args[0]), "instance must be a closure.");
-                        ObjFun *objFun = VALUE_TO_OBJCLOSURE(args[0])->fun;
-                        //-1是去掉实例self
-                        if (argNum - 1 < objFun->argNum)
-                            RUN_ERROR("arguments less.");
+                        //vm->curThread已经由返回false的函数置为下一个线程
+                        //切换到下一个线程的上下文
+                        curThread = vm->curThread;
+                        LOAD_CUR_FRAME()
+                    }
+                    break;
 
-                        STORE_CUR_FRAME();
-                        createFrame(vm, curThread, VALUE_TO_OBJCLOSURE(args[0]), argNum);
-                        LOAD_CUR_FRAME() //加载最新的frame
-                        break;
+                case MT_SCRIPT:
+                    STORE_CUR_FRAME();
+                    createFrame(vm, curThread, (ObjClosure *) method->obj, argNum);
+                    LOAD_CUR_FRAME() //加载最新的frame
+                    break;
 
-                    default:
-                        NOT_REACHED()
-                }
-                LOOP();
+                case MT_FUN_CALL:
+                    ASSERT(VALUE_IS_OBJCLOSURE(args[0]), "instance must be a closure.");
+                    ObjFun *objFun = VALUE_TO_OBJCLOSURE(args[0])->fun;
+                    //-1是去掉实例self
+                    if (argNum - 1 < objFun->argNum)
+                        RUN_ERROR("arguments less.");
+
+                    STORE_CUR_FRAME();
+                    createFrame(vm, curThread, VALUE_TO_OBJCLOSURE(args[0]), argNum);
+                    LOAD_CUR_FRAME() //加载最新的frame
+                    break;
+
+                default:
+                    NOT_REACHED()
             }
+            LOOP();
+        }
 
         CASE(LOAD_UPVALUE):
             //指令流：1字节的upvalue索引
@@ -722,9 +714,9 @@ DECODE {
         }
 
         CASE(END):
-            NOT_REACHED();
+            NOT_REACHED()
     }
-    NOT_REACHED();
+    NOT_REACHED()
 
 #undef PUSH
 #undef POP

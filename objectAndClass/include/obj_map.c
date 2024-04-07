@@ -4,7 +4,6 @@
 
 #include "obj_map.h"
 #include "class.h"
-#include "../../vm/vm.h"
 #include "obj_string.h"
 #include "obj_range.h"
 
@@ -28,8 +27,7 @@ static uint32_t hashNum(double num) {
 static uint32_t hashObj(ObjHeader *objHeader) {
     switch (objHeader->objType) {
         case OT_CLASS:
-            return mm3HashString(((Class *) objHeader)->name->value.start, ((Class *) objHeader)->name->value.length,
-                                 0);
+            return fnvLaHashString(((Class *) objHeader)->name->value.start, ((Class *) objHeader)->name->value.length);
 
         case OT_RANGE: {
             ObjRange *objRange = (ObjRange *) objHeader;

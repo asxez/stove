@@ -3,11 +3,9 @@
 //
 
 #include "class.h"
-#include "../../utils/common.h"
 #include <string.h>
 #include "obj_range.h"
 #include "../../vm/core.h"
-#include "../../vm/vm.h"
 #include "../../compiler/compiler.h"
 
 DEFINE_BUFFER_METHOD(Method)
@@ -97,7 +95,6 @@ Class *getClassOfObj(VM *vm, Value object) {
         case VT_OBJ:
             return VALUE_TO_OBJ(object)->class;
         default:
-            NOT_REACHED();
+            NOT_REACHED()
     }
-    return NULL;
 }

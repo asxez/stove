@@ -4,7 +4,6 @@
 
 #include "header_obj.h"
 #include "class.h"
-#include "../../vm/vm.h"
 
 DEFINE_BUFFER_METHOD(Value)
 

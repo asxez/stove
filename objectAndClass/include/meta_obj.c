@@ -4,7 +4,6 @@
 
 #include "meta_obj.h"
 #include "class.h"
-#include "../../vm/vm.h"
 #include <string.h>
 
 //新建模块

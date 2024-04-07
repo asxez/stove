@@ -3,14 +3,10 @@
 //
 
 #include "parser.h"
-#include <stdio.h>
 #include <stdlib.h>
-#include "../../utils/common.h"
-#include "../../utils/utils.h"
 #include "../../utils/unicodeUtf8.h"
 #include <string.h>
 #include <ctype.h>
-#include "../../objectAndClass/include/obj_string.h"
 #include "../../objectAndClass/include/class.h"
 
 struct keywordToken {

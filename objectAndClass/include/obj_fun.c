@@ -4,7 +4,6 @@
 
 #include "obj_fun.h"
 #include "class.h"
-#include "../../vm/vm.h"
 
 //创建一个空函数
 ObjFun *newObjFun(VM *vm, ObjModule *objModule, uint32_t slotNum) {

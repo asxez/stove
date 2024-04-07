@@ -3,9 +3,6 @@
 //
 
 #include "obj_range.h"
-#include "../../utils/utils.h"
-#include "class.h"
-#include "../../vm/vm.h"
 
 ObjRange *newObjRange(VM *vm, int from, int to) {
     ObjRange *objRange = ALLOCATE(vm, ObjRange);

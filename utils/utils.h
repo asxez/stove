@@ -113,7 +113,7 @@ typedef enum {
 
 void errorReport(void *parser, ErrorType errorType, const char *fmt, ...);
 
-void symbolTableClear(VM *, SymbolTable *buffer);
+void symbolTableClear(VM *vm, SymbolTable *buffer);
 
 #define IO_ERROR(...) \
     errorReport(NULL, ERROR_IO, __VA_ARGS__)

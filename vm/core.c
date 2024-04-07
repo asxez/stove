@@ -120,14 +120,14 @@ static ObjString *numToStr(VM *vm, double num) {
 static bool validateNum(VM *vm, Value arg) {
     if (VALUE_IS_NUM(arg))
         return true;
-    SET_ERROR_FALSE(vm, "argument must be number.");
+    SET_ERROR_FALSE(vm, "argument must be number.")
 }
 
 //判断arg是否是字符串
 static bool validateString(VM *vm, Value arg) {
     if (VALUE_IS_OBJSTR(arg))
         return true;
-    SET_ERROR_FALSE(vm, "argument must be string.");
+    SET_ERROR_FALSE(vm, "argument must be string.")
 }
 
 //判断value是否是整数
@@ -267,17 +267,23 @@ static int findString(ObjString *haystack, ObjString *needle) {
     uint32_t needleEndIndex = needle->value.length - 1;
 
     //1. 先假定 bad-character 不属于needle，对于这种清空，滑动窗口跨过整个needle
-    uint32_t idx;
-    for (idx = 0; idx < UINT8_MAX; idx++)
-        //默认为滑动整个needle的长度
+    uint32_t idx = 0;
+    while (idx < UINT8_MAX) {
+        // 默认为滑过整个needle的长度
         shift[idx] = needle->value.length;
+        idx++;
+    }
 
     //2. 假定haystack中与needle不匹配的字符在needle中之前已匹配过的位置出现过，就滑动窗口以使该字符与在needle中匹配该字符的最末位置对齐
     //这里预先确定需要滑动的距离
-    for (idx = 0; idx < needleEndIndex; idx++) {
+    idx = 0;
+    while (idx < needleEndIndex) {
         char c = needle->value.start[idx];
-        //idx从前往后遍历needle，当needle中有重复的字符c时，后面的字符c会覆盖前面的同名字符c，这保证了数组shift中字符是needle中最末位置的字符，从而保证了shift[c]的值是needle中最末端同名字符与needle末端的偏移量
+        //idx从前往后遍历needle,当needle中有重复的字符c时,
+        //后面的字符c会覆盖前面的同名字符c,这保证了数组shilf中字符是needle中最末位置的字符,
+        //从而保证了shilf[c]的值是needle中最末端同名字符与needle末端的偏移量
         shift[(uint8_t) c] = needleEndIndex - idx;
+        idx++;
     }
 
     //Boyer-Moore-Horspool是从后往前比较，这是处理 bad-character 高效的地方，因此获取needle中最后一个字符，用于同haystack的窗口中最后一个字符比较
@@ -812,9 +818,9 @@ static bool primStringFromCodePoint(VM *vm, Value *args) {
         return false;
     int codePoint = (int) VALUE_TO_NUM(args[1]);
     if (codePoint < 0)
-        SET_ERROR_FALSE(vm, "code point can't be negetive.");
+        SET_ERROR_FALSE(vm, "code point can't be negetive.")
     if (codePoint > 0x10ffff)
-        SET_ERROR_FALSE(vm, "code point must be between 0 and 0x10ffff.");
+        SET_ERROR_FALSE(vm, "code point must be between 0 and 0x10ffff.")
     RET_VALUE(makeStringFromCodePoint(vm, codePoint))
 }
 
@@ -912,7 +918,7 @@ static bool primStringStartsWith(VM *vm, Value *args) {
     //若pattern比原串长，肯定不包括
     if (pattern->value.length > objString->value.length)
         RET_FALSE
-    RET_BOOL(memcmp(objString->value.start, pattern->value.start, pattern->value.length) == 0);
+    RET_BOOL(memcmp(objString->value.start, pattern->value.start, pattern->value.length) == 0)
 }
 
 //objString.endsWith(_)：返回字符串是否以args[1]为结束
@@ -1042,9 +1048,11 @@ static bool primListSubScript(VM *vm, Value *args) {
 
     //新建一个list存储该range在原来list中索引的元素
     ObjList *result = newObjList(vm, count);
-    uint32_t idx;
-    for (idx = 0; idx < count; idx++)
+    uint32_t idx = 0;
+    while (idx < count) {
         result->elements.datas[idx] = objList->elements.datas[startIndex + idx * direction];
+        idx++;
+    }
     RET_OBJ(result)
 }
 
@@ -1249,11 +1257,13 @@ static bool primMapIterate(VM *vm, Value *args) {
         index++; //更新迭代器
     }
 
-    //返回下一个正在使用（有效）的entry
-    for (; index < objMap->capacity; index++)
+    //返回下一个正在使用(有效)的entry
+    while (index < objMap->capacity) {
         //entries是个数组，元素是哈希槽，哈希值散布在这些槽中，不连续，因此逐个判断槽位是否在用
         if (!VALUE_IS_UNDEFINED(objMap->entries[index].key))
             RET_NUM(index) //返回entry索引
+        index++;
+    }
 
     //若没有有效的entry了就返回false，迭代结束
     RET_FALSE
@@ -1531,8 +1541,11 @@ static void bindFunOverloadCall(VM *vm, const char *sign) {
 
 // 执行模块
 VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
-    ObjThread *objThread = loadModule(vm, moduleName, moduleCode);
-    return executeInstruction(vm, objThread);
+    register ObjThread *objThread = loadModule(vm, moduleName, moduleCode);
+    printf("execute");
+    executeInstruction(vm, objThread);
+    printf("exe");
+    return VM_RESULT_SUCCESS;
 }
 
 // 编译核心模块
@@ -1573,6 +1586,8 @@ void buildCore(VM *vm) {
 
     //执行核心模块
     executeModule(vm, CORE_MODULE, coreModuleCode);
+
+    printf("buildCore.");
 
     //Bool类定义在coreScript.inc文件中，将其挂载Bool类到vm->boolClass
     vm->boolClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Bool"));

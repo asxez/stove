@@ -82,8 +82,7 @@ uint8_t encodeUtf8(uint8_t *buf, int value) {
         return 4;
     }
 
-    NOT_REACHED();
-    return 0;
+    NOT_REACHED()
 }
 
 //解码以bytePtr为起始地址的UTF-8序列，其最大长度为length，若不是UTF-8序列则返回-1

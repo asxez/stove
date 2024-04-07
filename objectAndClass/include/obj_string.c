@@ -5,9 +5,6 @@
 #include "obj_string.h"
 #include <string.h>
 #include "../../vm/vm.h"
-#include "../../utils/utils.h"
-#include "../../utils/common.h"
-#include <stdlib.h>
 
 //fnv-la算法
 uint32_t fnvLaHashString(char *str, uint32_t length) {
@@ -76,7 +73,7 @@ uint32_t mm3HashString(const char *str, uint32_t length, uint32_t seed) {
 
 //为string计算哈希码并将值存储到string-hash
 void hashObjString(ObjString *objString) {
-    objString->hashCode = mm3HashString(objString->value.start, objString->value.length, 0);
+    objString->hashCode = fnvLaHashString(objString->value.start, objString->value.length);
 }
 
 ObjString *newObjString(VM *vm, const char *str, uint32_t length) {
