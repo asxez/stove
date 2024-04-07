@@ -1,8 +1,1 @@
-import people for People
-
-define test() {
-    var test = People("asxe", 19.0)
-    test.sayHi()
-}
-
-test()
+System.print(1)

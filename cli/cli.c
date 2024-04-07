@@ -7,7 +7,6 @@
 #include "../lexicalParser/include/parser.h"
 #include "../vm/vm.h"
 #include "../vm/core.h"
-#include "../lexicalParser/include/token.list"
 #include "../objectAndClass/include/class.h"
 
 //执行脚本文件

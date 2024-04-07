@@ -274,18 +274,10 @@ static int findString(ObjString *haystack, ObjString *needle) {
 
     //2. 假定haystack中与needle不匹配的字符在needle中之前已匹配过的位置出现过，就滑动窗口以使该字符与在needle中匹配该字符的最末位置对齐
     //这里预先确定需要滑动的距离
-    idx = 0;
-    while (idx < needleEndIndex) {
-        char c = needle->value.start[idx];
-        //idx从前往后遍历needle，当needle中有重复的字符c时，后面的字符c会覆盖前面的同名字符c，这保证了数组shift中字符是needle中最末位置的字符，从而保证了shift[c]的值是needle中最末端同名字符与needle末端的偏移量
-        shift[(uint8_t) c] = needleEndIndex - idx;
-        idx++;
-    }
-
     for (idx = 0; idx < needleEndIndex; idx++) {
         char c = needle->value.start[idx];
         //idx从前往后遍历needle，当needle中有重复的字符c时，后面的字符c会覆盖前面的同名字符c，这保证了数组shift中字符是needle中最末位置的字符，从而保证了shift[c]的值是needle中最末端同名字符与needle末端的偏移量
-
+        shift[(uint8_t) c] = needleEndIndex - idx;
     }
 
     //Boyer-Moore-Horspool是从后往前比较，这是处理 bad-character 高效的地方，因此获取needle中最后一个字符，用于同haystack的窗口中最后一个字符比较
@@ -1737,4 +1729,12 @@ void buildCore(VM *vm) {
     PRIM_METHOD_BIND(systemClass->objHeader.class, "importModule(_)", primSystemImportModule)
     PRIM_METHOD_BIND(systemClass->objHeader.class, "getModuleVariable(_,_)", primSystemGetModuleVariable)
     PRIM_METHOD_BIND(systemClass->objHeader.class, "writeString_(_)", primSystemWriteString)
+
+    //在核心自举过程中创建了很多ObjString对象，创建过程中需要调用initObjHeader初始化对象头，使其class指向vm->stringClass，但那时的vm->stringClass尚未初始化，因此现在更正
+    ObjHeader *objHeader = vm->allObjects;
+    while (objHeader != NULL) {
+        if (objHeader->objType == OT_STRING)
+            objHeader->class = vm->stringClass;
+        objHeader = objHeader->next;
+    }
 }
