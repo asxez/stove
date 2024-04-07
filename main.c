@@ -11,8 +11,8 @@
 //static int findString(ObjString *haystack, ObjString *needle);
 #include "stdio.h"
 #include "stdint.h"
+#include "time.h"
 int main() {
-    int a = (uint32_t)'c';
-    printf("%d", a);
+    printf("%f", (double)time(NULL));
     return 0;
 }

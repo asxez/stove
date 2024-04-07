@@ -10,6 +10,7 @@
 #include "../compiler/compiler.h"
 #include "coreScript.inc"
 #include <ctype.h>
+#include <time.h>
 #include "../utils/unicodeUtf8.h"
 
 char *rootDir = NULL; // 根目录
@@ -52,6 +53,10 @@ char *rootDir = NULL; // 根目录
         method.primFun = func;                                                            \
         bindMethod(vm, classPtr, (uint32_t) globalIdx, method);                           \
 }
+
+static ObjThread *loadModule(VM *vm, Value moduleName, const char *moduleCode);
+
+static ObjModule *getModule(VM *vm, Value moduleName);
 
 // 读取源代码文件
 char *readFile(const char *path) {
@@ -318,6 +323,87 @@ static bool validateKey(VM *vm, Value arg) {
             )
         return true;
     SET_ERROR_FALSE(vm, "key must be value type.")
+}
+
+//获取文件全路径
+static char *getFilePath(const char *moduleName) {
+    uint32_t rootDirLength = rootDir == NULL ? 0 : strlen(rootDir);
+    uint32_t nameLength = strlen(moduleName);
+    uint32_t pathLength = rootDirLength + nameLength + strlen(".stv");
+    char *path = (char *) malloc(pathLength + 1);
+
+    if (rootDir != NULL)
+        memmove(path, rootDir, rootDirLength);
+
+    memmove(path + rootDirLength, moduleName, nameLength);
+    memmove(path + rootDirLength + nameLength, ".stv", 4);
+    path[pathLength] = EOS;
+
+    return path;
+}
+
+//读取模块
+static char *readModule(const char *moduleName) {
+    //1. 读取内建模块。。。
+
+    //2. 读取自定义模块
+    char *modulePath = getFilePath(moduleName);
+    char *moduleCode = readFile(modulePath);
+    free(modulePath);
+
+    return moduleCode; //由主调函数将来释放此空间
+}
+
+//输出字符串
+static void printString(const char *str) {
+    //输出到缓冲区后立即刷新
+    printf("%s", str);
+    fflush(stdout);
+}
+
+//导入模块moduleName，主要是编译模块加载到vm->allModules
+static Value importModule(VM *vm, Value moduleName) {
+    //若已经导入则返回NULL_VAL
+    if (!VALUE_IS_UNDEFINED(mapGet(vm->allModules, moduleName)))
+        return VT_TO_VALUE(VT_NULL);
+    ObjString *objString = VALUE_TO_OBJSTR(moduleName);
+    const char *sourceCode = readModule(objString->value.start);
+
+    ObjThread *moduleThread = loadModule(vm, moduleName, sourceCode);
+    return OBJ_TO_VALUE(moduleThread);
+}
+
+//在模块moduleName中获取模块变量variableName
+static Value getModuleVariable(VM *vm, Value moduleName, Value variableName) {
+    //调用本函数前模块已经被加载了
+    ObjModule *objModule = getModule(vm, moduleName);
+    if (objModule == NULL) {
+        ObjString *modName = VALUE_TO_OBJSTR(moduleName);
+
+        //24是下面sprintf中fmt中除%s的字符个数
+        ASSERT(modName->value.length < 512 - 24, "id's buffer not big enough.");
+        char id[512] = {EOS};
+        int len = sprintf(id, "module \'%s\' is not loaded.", modName->value.start);
+        vm->curThread->errorObj = OBJ_TO_VALUE(newObjString(vm, id, len));
+        return VT_TO_VALUE(VT_NULL);
+    }
+
+    ObjString *varName = VALUE_TO_OBJSTR(variableName);
+
+    //从moduleVarName中获得待导入的模块变量
+    int index = getIndexFromSymbolTable(&objModule->moduleVarName, varName->value.start, varName->value.length);
+    if (index == -1) {
+        //32是下面fmt的字符个数
+        ASSERT(varName->value.length < 512 - 32, "id's buffer not big enough.");
+        ObjString *modName = VALUE_TO_OBJSTR(moduleName);
+        char id[512] = {EOS};
+        int len = sprintf(id, "variable \'%s\' is not in module \'%s\'.", varName->value.start, modName->value.start);
+        vm->curThread->errorObj = OBJ_TO_VALUE(newObjString(vm, id, len));
+        return VT_TO_VALUE(VT_NULL);
+    }
+
+    //直接返回对应的模块变量
+    return objModule->moduleVarValue.datas[index];
 }
 
 // !object: object取反，结果为false
@@ -1278,6 +1364,67 @@ static bool primRangeIteratorValue(VM *vm UNUSED, Value *args) {
     RET_FALSE
 }
 
+//System.clock：返回以秒为单位的系统时钟
+static bool primSystemClock(VM *vm UNUSED, Value *args UNUSED) {
+    RET_NUM((double) time(NULL))
+}
+
+//System.importModule(_)：导入并编译模块args[1]，把模块挂载到vm->allModules
+static bool primSystemImportModule(VM *vm, Value *args) {
+    if (!validateString(vm, args[1])) //模块名为字符串
+        return false;
+
+    //导入模块name并编译，把模块挂载到vm->allModules
+    Value result = importModule(vm, args[1]);
+    //若已经导入过则返回NULL_VAL
+    if (VALUE_IS_NULL(result))
+        RET_NULL
+
+    //若编译过程中出了问题，切换到下一线程
+    if (!VALUE_IS_NULL(vm->curThread->errorObj))
+        return false;
+
+    //回收1个slot空间
+    vm->curThread->esp--;
+
+    ObjThread *nextThread = VALUE_TO_OBJTHREAD(result);
+    nextThread->caller = vm->curThread;
+    vm->curThread = nextThread;
+    //返回false，vm会切换到此新加载模块的线程
+    return false;
+}
+
+//System.getModuleVariable(_,_)：获取模块args[1]中的模块变量args[2]
+static bool primSystemGetModuleVariable(VM *vm, Value *args) {
+    if (!validateString(vm, args[1]))
+        return false;
+
+    if (!validateString(vm, args[2]))
+        return false;
+
+    Value result = getModuleVariable(vm, args[1], args[2]);
+    if (VALUE_IS_NULL(result))
+        return false;
+
+    RET_VALUE(result)
+}
+
+//System.writeString_(_)：输出字符串args[1]
+static bool primSystemWriteString(VM *vm UNUSED, Value *args) {
+    ObjString *objString = VALUE_TO_OBJSTR(args[1]);
+    ASSERT(objString->value.start[objString->value.length] == EOS, "string isn't terminated.");
+    printString(objString->value.start);
+    RET_VALUE(args[1])
+}
+
+////System.len(_)：返回参数的长度
+//static bool primSystemLen(VM *vm, Value *args) {
+//    if (validateString(vm, args[1]))
+//        RET_NUM(VALUE_TO_OBJSTR(args[1])->value.length);
+//
+//    if ()
+//}
+
 //从modules中获取名为moduleName的模块
 static ObjModule *getModule(VM *vm, Value moduleName) {
     Value value = mapGet(vm->allModules, moduleName);
@@ -1296,7 +1443,8 @@ static ObjThread *loadModule(VM *vm, Value moduleName, const char *moduleCode) {
     if (module == NULL) {
         //创建模块并添加到vm->allModules中
         ObjString *newModuleName = VALUE_TO_OBJSTR(moduleName);
-        ASSERT(newModuleName->value.start[newModuleName->value.length] == EOS, "string.value.start is not terminated.");
+        ASSERT(newModuleName->value.start[newModuleName->value.length] == EOS,
+               "string.value.start is not terminated.");
         module = newObjModule(vm, newModuleName->value.start);
         mapSet(vm, vm->allModules, moduleName, OBJ_TO_VALUE(module));
 
@@ -1305,7 +1453,8 @@ static ObjThread *loadModule(VM *vm, Value moduleName, const char *moduleCode) {
         uint32_t idx = 0;
         while (idx < coreModule->moduleVarName.count) {
             defineModuleVar(vm, module, coreModule->moduleVarName.datas[idx].str,
-                            strlen(coreModule->moduleVarName.datas[idx].str), coreModule->moduleVarValue.datas[idx]);
+                            strlen(coreModule->moduleVarName.datas[idx].str),
+                            coreModule->moduleVarValue.datas[idx]);
             idx++;
         }
     }
@@ -1581,4 +1730,11 @@ void buildCore(VM *vm) {
     PRIM_METHOD_BIND(vm->rangeClass, "max", primRangeMax)
     PRIM_METHOD_BIND(vm->rangeClass, "iterate(_)", primRangeIterate)
     PRIM_METHOD_BIND(vm->rangeClass, "iteratorValue(_)", primRangeIteratorValue)
+
+    //绑定System类
+    Class *systemClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "System"));
+    PRIM_METHOD_BIND(systemClass->objHeader.class, "clock", primSystemClock)
+    PRIM_METHOD_BIND(systemClass->objHeader.class, "importModule(_)", primSystemImportModule)
+    PRIM_METHOD_BIND(systemClass->objHeader.class, "getModuleVariable(_,_)", primSystemGetModuleVariable)
+    PRIM_METHOD_BIND(systemClass->objHeader.class, "writeString_(_)", primSystemWriteString)
 }
