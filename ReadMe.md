@@ -1,8 +1,8 @@
-# The Stove programming language
+# 🚀 The Stove programming language
 
 The Stove programming language is an object-oriented, interpreted language.
 
-## Build Instructions
+## 🛠️ Build Instructions
 On windows, download the source code and go to the source code folder:
 ```bash
 make
@@ -13,7 +13,7 @@ now you will get a file called stove.exe, then:
 ```
 if you can look a string on console, the string is "this is a test code for Stove.", so that's ok now.
 
-## Using Stove
+## 💻 Using Stove
 1. It's if-else statement
 ```stove
 if (condition) {
@@ -184,7 +184,7 @@ System.print()     //without arg will output "\n"
 System.clock       //it's return timestamp
 ```
 
-## Existing problems
+## ❓ Existing problems
 1. The for loop statement fails to iterate, for example:
 ```stove
 for i (1..10) {
@@ -215,5 +215,5 @@ t.say()
 it will output an error:
 ![](Docs/img/5.png)
 
-## Contribute to the stove
+## 🤝 Contribute to the stove
 You can create an issue or pull request, if you pull request, you should bring your test code and effects.
