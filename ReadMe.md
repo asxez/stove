@@ -1,5 +1,7 @@
 # 🚀 The Stove programming language
 
+<a href="./ReadMe_CN.md">中文文档</a>
+
 The Stove programming language is an object-oriented, interpreted language.
 
 ## 🛠️ Build Instructions
@@ -70,7 +72,7 @@ var count = a.count                     //return length of list
 var element = a.insert(index, element)  //insert the element at the index and return this element
 var element = a.removeAt(index)         //remove index element and return this element
 var element = a[index]                  //return index element
-a[index] = element                      //like insert() method
+a[index] = element                      //modify the value of the element at the index
 ```
 
 6. You can define a map object in the form of literals or underlying method.
@@ -87,7 +89,7 @@ var bool = a.containsKey(key)  //check whether a key exists in the map object an
 var count = a.count            //return the number of key-value pairs in a map object
 var value = a.remove(key)      //remove key's value and return this value
 var value = a[key]             //you can refer to the index value of the Python dictionary
-a[key] = value                 //add a key-value pair
+a[key] = value                 //if a key already exists, modify the value, otherwise add a key-value pair
 ```
 
 7. You can define a range object in the following way:
