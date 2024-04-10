@@ -228,6 +228,9 @@ static void patchOperand(Class *class, ObjFun *fun) {
 
 //绑定方法和修正操作数
 static void bindMethodAndPatch(VM *vm, OpCode opCode, uint32_t methodIndex, Class *class, Value methodValue) {
+    if (class->objHeader.class == NULL)
+        class->objHeader.class = class;
+
     //如果是静态方法，就将类指向meta类（使接收者为meta类）
     if (opCode == OPCODE_STATIC_METHOD)
         class = class->objHeader.class;
@@ -705,6 +708,9 @@ DECODE {
 
             //从次栈顶中获得待绑定的方法，这是由OPCODE_CREATE_CLOSURE操作码生成后压到栈中的
             Value method = PEEK2();
+
+//            printf("method:%u", method.type);
+//            printf("class:%s\n", class->name->value.start);
 
             bindMethodAndPatch(vm, opCode, methodNameIndex, class, method);
 

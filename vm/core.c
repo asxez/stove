@@ -1474,7 +1474,7 @@ int getIndexFromSymbolTable(SymbolTable *table, const char *symbol, uint32_t len
     uint32_t index = 0;
     while (index < table->count) {
         if (length == table->datas[index].length && memcmp(table->datas[index].str, symbol, length) == 0)
-            return (int) index;
+            return index;
         index++;
     }
     return -1;
@@ -1489,7 +1489,7 @@ int addSymbol(VM *vm, SymbolTable *table, const char *symbol, uint32_t length) {
     string.str[length] = EOS;
     string.length = length;
     StringBufferAdd(vm, table, string);
-    return (int) (table->count - 1);
+    return table->count - 1;
 }
 
 //确保符号已添加到符号表
@@ -1542,10 +1542,7 @@ static void bindFunOverloadCall(VM *vm, const char *sign) {
 // 执行模块
 VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
     register ObjThread *objThread = loadModule(vm, moduleName, moduleCode);
-    printf("execute");
-    executeInstruction(vm, objThread);
-    printf("exe");
-    return VM_RESULT_SUCCESS;
+    return executeInstruction(vm, objThread);
 }
 
 // 编译核心模块
@@ -1587,8 +1584,6 @@ void buildCore(VM *vm) {
     //执行核心模块
     executeModule(vm, CORE_MODULE, coreModuleCode);
 
-    printf("buildCore.");
-
     //Bool类定义在coreScript.inc文件中，将其挂载Bool类到vm->boolClass
     vm->boolClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Bool"));
     PRIM_METHOD_BIND(vm->boolClass, "toString", primBoolToString)
@@ -1596,6 +1591,9 @@ void buildCore(VM *vm) {
 
     //Thread类也是coreScript.inc中定义的，将其挂载到vm->threadClass并补充原生方法
     vm->threadClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Thread"));
+    if (vm->threadClass->objHeader.class == NULL)
+        vm->threadClass->objHeader.class = vm->threadClass;
+
     //以下是类方法
     PRIM_METHOD_BIND(vm->threadClass->objHeader.class, "new(_)", primThreadNew)
     PRIM_METHOD_BIND(vm->threadClass->objHeader.class, "abort(_)", primThreadAbort)
@@ -1610,6 +1608,9 @@ void buildCore(VM *vm) {
 
     //绑定函数类
     vm->funClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Fun"));
+    if (vm->funClass->objHeader.class == NULL)
+        vm->funClass->objHeader.class = vm->funClass;
+
     PRIM_METHOD_BIND(vm->funClass->objHeader.class, "new(_)", primFunNew)
     //绑定call的重载方法
     bindFunOverloadCall(vm, "call()");
@@ -1637,6 +1638,9 @@ void buildCore(VM *vm) {
 
     //绑定Num类的方法
     vm->numClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Num"));
+    if (vm->numClass->objHeader.class == NULL)
+        vm->numClass->objHeader.class = vm->numClass;
+
     //类方法
     PRIM_METHOD_BIND(vm->numClass->objHeader.class, "fromString(_)", primStringToNum)
     PRIM_METHOD_BIND(vm->numClass->objHeader.class, "pi", primNumPi)
@@ -1684,6 +1688,9 @@ void buildCore(VM *vm) {
 
     //绑定字符串类
     vm->stringClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "String"));
+    if (vm->stringClass->objHeader.class == NULL)
+        vm->stringClass->objHeader.class = vm->stringClass;
+
     PRIM_METHOD_BIND(vm->stringClass->objHeader.class, "fromCodePoint(_)", primStringFromCodePoint)
 
     PRIM_METHOD_BIND(vm->stringClass, "+(_)", primStringPlus)
@@ -1703,6 +1710,9 @@ void buildCore(VM *vm) {
 
     //绑定List类
     vm->listClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "List"));
+    if (vm->listClass->objHeader.class == NULL)
+        vm->listClass->objHeader.class = vm->listClass;
+
     PRIM_METHOD_BIND(vm->listClass->objHeader.class, "new()", primListNew)
     PRIM_METHOD_BIND(vm->listClass, "[_]", primListSubScript)
     PRIM_METHOD_BIND(vm->listClass, "[_]=(_)", primListSubScriptSetter)
@@ -1713,10 +1723,13 @@ void buildCore(VM *vm) {
     PRIM_METHOD_BIND(vm->listClass, "insert(_,_)", primListInsert)
     PRIM_METHOD_BIND(vm->listClass, "iterate(_)", primListIterate)
     PRIM_METHOD_BIND(vm->listClass, "iteratorValue(_)", primListIteratorValue)
-    PRIM_METHOD_BIND(vm->listClass, "remove(_)", primListRemove)
+    PRIM_METHOD_BIND(vm->listClass, "removeAt(_)", primListRemove)
 
     //绑定Map类
     vm->mapClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "Map"));
+    if (vm->mapClass->objHeader.class == NULL)
+        vm->mapClass->objHeader.class = vm->mapClass;
+
     PRIM_METHOD_BIND(vm->mapClass->objHeader.class, "new()", primMapNew)
     PRIM_METHOD_BIND(vm->mapClass, "[_]", primMapSubScript)
     PRIM_METHOD_BIND(vm->mapClass, "[_]=(_)", primMapSubScriptSetter)
@@ -1740,6 +1753,9 @@ void buildCore(VM *vm) {
 
     //绑定System类
     Class *systemClass = VALUE_TO_CLASS(getCoreClassValue(coreModule, "System"));
+    if (systemClass->objHeader.class == NULL)
+        systemClass->objHeader.class = systemClass;
+
     PRIM_METHOD_BIND(systemClass->objHeader.class, "clock", primSystemClock)
     PRIM_METHOD_BIND(systemClass->objHeader.class, "importModule(_)", primSystemImportModule)
     PRIM_METHOD_BIND(systemClass->objHeader.class, "getModuleVariable(_,_)", primSystemGetModuleVariable)

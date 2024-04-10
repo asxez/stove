@@ -43,6 +43,7 @@ struct vm {
 
 void initVM(VM *vm);
 VM *newVM(void);
+void ensureStack(VM *vm, ObjThread *objThread, uint32_t neededSlots);
 VMResult executeInstruction(VM *vm, register ObjThread *curThread);
 
 #endif //STOVE_VM_H

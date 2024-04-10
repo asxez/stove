@@ -17,7 +17,7 @@ bool valueIsEqual(Value a, Value b) {
         return false;
 
     if (a.type == VT_NUM)
-        return (bool) (a.num == b.num);
+        return a.num == b.num;
 
     if (a.objHeader == b.objHeader)
         return true;
@@ -28,14 +28,14 @@ bool valueIsEqual(Value a, Value b) {
     if (a.objHeader->objType == OT_STRING) {
         ObjString *strA = VALUE_TO_OBJSTR(a);
         ObjString *strB = VALUE_TO_OBJSTR(b);
-        return (bool) (strA->value.length == strB->value.length &&
+        return (strA->value.length == strB->value.length &&
                        memcmp(strA->value.start, strB->value.start, strA->value.length) == 0);
     }
 
     if (a.objHeader->objType == OT_RANGE) {
         ObjRange *rgA = VALUE_TO_OBJRANGE(a);
         ObjRange *rgB = VALUE_TO_OBJRANGE(b);
-        return (bool) (rgA->from == rgB->from && rgA->to == rgB->to);
+        return (rgA->from == rgB->from && rgA->to == rgB->to);
     }
 
     return false;
@@ -97,4 +97,5 @@ Class *getClassOfObj(VM *vm, Value object) {
         default:
             NOT_REACHED()
     }
+    return NULL;
 }

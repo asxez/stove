@@ -28,13 +28,12 @@ typedef enum {
 #define NUM_TO_VALUE(num) ((Value){VT_NUM, {num}})
 #define VALUE_TO_NUM(value) value.num
 
-#define OBJ_TO_VALUE(objPtr)                     \
-    ({                                           \
+#define OBJ_TO_VALUE(objPtr) ({                  \
         Value value;                             \
-        value.type = VT_OBJ;                    \
+        value.type = VT_OBJ;                     \
         value.objHeader = (ObjHeader *)(objPtr); \
         value;                                   \
-    })
+        })
 
 #define VALUE_TO_OBJ(value) (value.objHeader)
 #define VALUE_TO_OBJSTR(value) ((ObjString *) VALUE_TO_OBJ(value))

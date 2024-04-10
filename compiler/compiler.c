@@ -136,7 +136,7 @@ static int writeByte(CompileUnit *cu, int byte) {
     IntBufferAdd(cu->curParser->vm, &cu->fun->debug->lineNo, cu->curParser->preToken.lineNo);
 #endif
     ByteBufferAdd(cu->curParser->vm, &cu->fun->instrStream, (uint8_t) byte);
-    return (int) (cu->fun->instrStream.count - 1);
+    return cu->fun->instrStream.count - 1;
 }
 
 //写入操作码
@@ -169,6 +169,34 @@ static int writeOpCodeByteOperand(CompileUnit *cu, OpCode opCode, int operand) {
 static void writeOpCodeShortOperand(CompileUnit *cu, OpCode opCode, int operand) {
     writeOpCode(cu, opCode);
     writeShortOperand(cu, operand);
+}
+
+//在模块objModule中定义名为name，值为value的模块变量
+int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
+    if (length > MAX_ID_LEN) {
+        //也许name指向的变量名并不以\0结束，将其从源码串中拷贝出来
+        char id[MAX_ID_LEN] = {EOS};
+        memcpy(id, name, length);
+
+        //本函数可能是在编译源码文件之前调用的，那时还没有创建parser，因此报错要分情况
+        if (vm->curParser != NULL)
+            COMPILE_ERROR(vm->curParser, "length of identifier \"%s\" should be no more than %d", id, MAX_ID_LEN);
+        else
+            MEM_ERROR("length of identifier \"%s\" should be no more than %d", id, MAX_ID_LEN);
+    }
+
+    //从模块变量名中查找变量，若不存在就添加
+    int symbolIndex = getIndexFromSymbolTable(&objModule->moduleVarName, name, length);
+    if (symbolIndex == -1) {
+        symbolIndex = addSymbol(vm, &objModule->moduleVarName, name, length); //添加变量名
+        ValueBufferAdd(vm, &objModule->moduleVarValue, value); //添加变量值
+    } else if (VALUE_IS_NUM(objModule->moduleVarValue.datas[symbolIndex]))
+        //若遇到之前预先声明的模块变量的定义，在此为其赋予正确的值
+        objModule->moduleVarValue.datas[symbolIndex] = value;
+    else
+        symbolIndex = -1;
+
+    return symbolIndex;
 }
 
 //添加常量并返回其索引
@@ -318,7 +346,7 @@ static int declareLocalVar(CompileUnit *cu, const char *name, uint32_t length) {
         idx--;
     }
     //检查过后声明该局部变量
-    return (int) addLocalVar(cu, name, length);
+    return addLocalVar(cu, name, length);
 }
 
 //丢掉作用域scopeDepth之内的局部变量
@@ -472,7 +500,7 @@ static void idMethodSignature(CompileUnit *cu, Signature *signature) {
             return;
     }
     //处理形参
-    processArgList(cu, signature);
+    processParaList(cu, signature);
     consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after parameter list.");
 }
 
@@ -528,13 +556,13 @@ static int addUpvalue(CompileUnit *cu, bool isEnclosingLocalVar, uint32_t index)
     while (idx < cu->fun->upvalueNum) {
         //如果该upvalue已经添加过了就返回其索引
         if (cu->upvalues[idx].index == index && cu->upvalues[idx].isEnclosingLocalVar == isEnclosingLocalVar)
-            return (int) idx;
+            return idx;
         idx++;
     }
     //若没有找到则将其添加
     cu->upvalues[cu->fun->upvalueNum].isEnclosingLocalVar = isEnclosingLocalVar;
     cu->upvalues[cu->fun->upvalueNum].index = index;
-    return (int) cu->fun->upvalueNum++;
+    return cu->fun->upvalueNum++;
 }
 
 //查找name指代的upvalue后添加到cu->upvalues，返回其索引，否则返回-1
@@ -870,7 +898,7 @@ static void stringInterpolation(CompileUnit *cu, bool canAssign UNUSED) {
     //其中a和d都是TOKEN_INTERPOLATION，b c e都是TOKEN_ID，f是TOKEN_STRING
 
     //创造一个list实例，拆分字符串，将拆分出的各部分作为元素添加到list
-    emitLoadModuleVar(cu, "list");
+    emitLoadModuleVar(cu, "List");
     emitCall(cu, 0, "new()", 5);
 
     //每次处理字符串中的一个内嵌表达式，包括两部分，以a % (b + c)为例：
@@ -880,12 +908,12 @@ static void stringInterpolation(CompileUnit *cu, bool canAssign UNUSED) {
         //1 处理TOKEN_INTERPOLATION中的字符串，如a % (b + c)中的a
         literal(cu, false);
         //将字符串添加到list
-        emitCall(cu, 1, "addCore_(_)", 11); //以_结尾的方法名是内部使用
+        emitCall(cu, 1, "appendCore_(_)", 14); //以_结尾的方法名是内部使用
 
         //2 解析内嵌表达式，如a % (b + c)中的b + c
         expression(cu, BP_LOWEST);
         //将结果添加到list
-        emitCall(cu, 1, "addCore_(_)", 11);
+        emitCall(cu, 1, "appendCore_(_)", 14);
     } while (matchToken(cu->curParser, TOKEN_INTERPOLATION));
     //处理下一个内嵌表达式，如a % (b + c) d % (e) f中的d % (e)
 
@@ -896,7 +924,7 @@ static void stringInterpolation(CompileUnit *cu, bool canAssign UNUSED) {
     literal(cu, false);
 
     //将字符串添加到list
-    emitCall(cu, 1, "addCore_(_)", 11);
+    emitCall(cu, 1, "appendCore_(_)", 14);
 
     //最后将以上list中的元素join为一个字符串
     emitCall(cu, 0, "join()", 6);
@@ -958,7 +986,7 @@ static void listLiteral(CompileUnit *cu, bool canAssign UNUSED) {
         if (PEEK_TOKEN(cu->curParser) == TOKEN_RIGHT_BRACKET)
             break;
         expression(cu, BP_LOWEST);
-        emitCall(cu, 1, "addCore_(_)", 11);
+        emitCall(cu, 1, "appendCore_(_)", 14);
     } while (matchToken(cu->curParser, TOKEN_COMMA));
 
     consumeCurToken(cu->curParser, TOKEN_RIGHT_BRACKET, "expect ']' after list element.");
@@ -1036,7 +1064,7 @@ static void mapLiteral(CompileUnit *cu, bool canAssign UNUSED) {
 
 //小写字符开头便是局部变量
 static bool isLocalName(const char *name) {
-    return (bool) (name[0] >= 'a' && name[0] <= 'z');
+    return (name[0] >= 'a' && name[0] <= 'z');
 }
 
 //标识符.nud()：变量名或方法名
@@ -1094,6 +1122,9 @@ static void id(CompileUnit *cu, bool canAssign) {
         if (classBK != NULL) {
             int fieldIndex = getIndexFromSymbolTable(&classBK->fields, name.start, name.length);
             if (fieldIndex != -1) {
+                if (classBK->inStatic)
+                    COMPILE_ERROR(cu->curParser, "instance field should not be used in static method.");
+
                 bool isRead = true;
                 if (canAssign && matchToken(cu->curParser, TOKEN_ASSIGN)) {
                     isRead = false;
@@ -1150,7 +1181,7 @@ static void id(CompileUnit *cu, bool canAssign) {
         var.index = getIndexFromSymbolTable(&cu->curParser->curModule->moduleVarName, name.start, name.length);
         if (var.index == -1) {
             //模块变量属于模块作用域，若当前引用处之前未定义该模块变量，说不定在后面有其定义，因此暂时先声明它，待模块统计完后再检查
-            //用关键字fun定义的函数是以前缀Fun后接函数名作为模块变量，下面加上Fun前缀按照函数名重新查找
+            //用关键字define定义的函数是以前缀Fun后接函数名作为模块变量，下面加上Fun前缀按照函数名重新查找
             char funName[MAX_SIGN_LEN + 5] = {EOS};
             memmove(funName, "Fun ", 4);
             memmove(funName + 4, name.start, name.length);
@@ -1189,7 +1220,7 @@ SymbolBindRule Rules[] = {
         UNUSED_RULE, //TOKEN_INVALID
         PREFIX_SYMBOL(literal), //TOKEN_NUM
         PREFIX_SYMBOL(literal), //TOKEN_STRING
-        {NULL, BP_LOWEST, id, NULL, idMethodSignature}, //TOKEN_ID
+        {NULL, BP_NONE, id, NULL, idMethodSignature}, //TOKEN_ID
         PREFIX_SYMBOL(stringInterpolation), //TOKEN_INTERPOLATION
         UNUSED_RULE, //TOKEN_VAR
         UNUSED_RULE, //TOKEN_FUN
@@ -1285,34 +1316,6 @@ static void unaryOperator(CompileUnit *cu, bool canAssign UNUSED) {
     //生成调用前缀运算符的指令
     //0个参数，前缀运算符都是1个字符，长度为1
     emitCall(cu, 0, rule->id, 1);
-}
-
-//在模块objModule中定义名为name，值为value的模块变量
-int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value) {
-    if (length > MAX_ID_LEN) {
-        //也许name指向的变量名并不以\0结束，将其从源码串中拷贝出来
-        char id[MAX_ID_LEN] = {EOS};
-        memcpy(id, name, length);
-
-        //本函数可能是在编译源码文件之前调用的，那时还没有创建parser，因此报错要分情况
-        if (vm->curParser != NULL)
-            COMPILE_ERROR(vm->curParser, "length of identifier \"%s\" should be no more than %d", id, MAX_ID_LEN);
-        else
-            MEM_ERROR("length of identifier \"%s\" should be no more than %d", id, MAX_ID_LEN);
-    }
-
-    //从模块变量名中查找变量，若不存在就添加
-    int symbolIndex = getIndexFromSymbolTable(&objModule->moduleVarName, name, length);
-    if (symbolIndex == -1) {
-        symbolIndex = addSymbol(vm, &objModule->moduleVarName, name, length); //添加变量名
-        ValueBufferAdd(vm, &objModule->moduleVarValue, value); //添加变量值
-    } else if (VALUE_IS_NUM(objModule->moduleVarValue.datas[symbolIndex]))
-        //若遇到之前预先声明的模块变量的定义，在此为其赋予正确的值
-        objModule->moduleVarValue.datas[symbolIndex] = value;
-    else
-        symbolIndex = -1;
-
-    return symbolIndex;
 }
 
 //编译变量定义
@@ -1639,8 +1642,8 @@ static void compileForStatement(CompileUnit *cu) {
     consumeCurToken(cu->curParser, TOKEN_RIGHT_PAREN, "expect ')' after for statement sequence.");
     //申请一个局部变量seq来存储序列对象，其值就是上面expression存储到栈中的结果
     uint32_t seqSlot = addLocalVar(cu, "seq ", 4);
-    writeOpCode(cu, OPCODE_PUSH_NULL);
 
+    writeOpCode(cu, OPCODE_PUSH_NULL);
     //分配及初始化iter，其值就是上面加载到栈中的NULL
     uint32_t iterSlot = addLocalVar(cu, "iter ", 5);
 
@@ -2058,7 +2061,7 @@ ObjFun *compileModule(VM *vm, ObjModule *objModule, const char *moduleCode) {
 
     if (objModule->name == NULL)
         //核心模块是coreScript.inc
-        initParser(vm, &parser, "coreScript.inc", moduleCode, objModule);
+        initParser(vm, &parser, "../vm/coreScript.inc", moduleCode, objModule);
     else
         initParser(vm, &parser, (const char *) objModule->name->value.start, moduleCode, objModule);
 

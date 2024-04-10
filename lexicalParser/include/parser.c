@@ -281,6 +281,7 @@ void getNextToken(Parser *parser) {
     parser->curToken.tokenType = TOKEN_EOF;
     parser->curToken.length = 0;
     parser->curToken.start = parser->nextCharPtr - 1;
+    parser->curToken.value = VT_TO_VALUE(VT_UNDEFINED);
     while (parser->curChar != EOS) {
         switch (parser->curChar) {
             case ',':

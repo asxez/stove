@@ -32,7 +32,7 @@ ObjClosure *newObjClosure(VM *vm, ObjFun *objFun) {
 
     //清除upvalue数组，以避免在填充upvalue数组之前触发GC
     uint32_t idx = 0;
-    while (idx <objFun->upvalueNum) {
+    while (idx < objFun->upvalueNum) {
         objClosure->upvalues[idx] = NULL;
         idx++;
     }

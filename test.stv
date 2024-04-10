@@ -1,2 +1,26 @@
-var a = "aaa"
-System.print(a)
+var range = 1..10
+var test = range.iteratorValue(5)
+System.print(test)
+
+for i (1..10) {
+    System.print(i)
+}
+
+var num = 0
+while (num < 10) {
+    System.print(num)
+    num = num + 1
+}
+
+
+var a = ["a", "s", "x", "e"]
+System.print(a[1])
+System.print(a.count)
+
+define test_fun(arg) {
+    System.print(arg)
+    return "asxe"
+}
+
+var ans = test_fun("asxe666")
+System.print(ans)

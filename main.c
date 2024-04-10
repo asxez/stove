@@ -32,23 +32,5 @@ int main(int argc, const char **argv) {
 //    const char *sourceCode = "System.print(\"111\")";
 //    VMResult a = executeModule(vm, OBJ_TO_VALUE("test"), sourceCode);
 //    printf("%d", a);
-int test = 3;
-    start:
-    switch (test) {
-        case 0:
-        case 1:
-            printf("1");
-            goto start;
-        case 2:
-            printf("2");
-            goto start;
-
-            {
-                int b = 1;
-                printf("%d", b);
-                goto start;
-            }
-    }
-
     return 0;
 }
