@@ -50,7 +50,10 @@ Class *newRawClass(VM *vm, const char *name, uint32_t fieldNum) {
     class->name = newObjString(vm, name, strlen(name));
     class->fieldNum = fieldNum;
     class->superClass = NULL; //裸类无基类
+
+    pushTmpRoot(vm, (ObjHeader *) class);
     MethodBufferInit(&class->methods);
+    popTmpRoot(vm);
     return class;
 }
 
@@ -75,9 +78,13 @@ Class *newClass(VM *vm, ObjString *className, uint32_t fieldNum, Class *superCla
     memcpy(newClassName, className->value.start, className->value.length);
     newClassName[className->value.length] = EOS;
     Class *class = newRawClass(vm, newClassName, fieldNum);
+    pushTmpRoot(vm, (ObjHeader *) class);
 
     className->objHeader.class = metaClass;
     bindSuperClass(vm, class, superClass);
+
+    popTmpRoot(vm); //metaclass
+    popTmpRoot(vm); //class
 
     return class;
 }

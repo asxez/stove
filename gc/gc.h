@@ -8,5 +8,6 @@
 
 void grayObject(VM *vm, ObjHeader *obj);
 void grayValue(VM *vm, Value value);
+void startGC(VM *vm);
 
 #endif //STOVE_GC_H

@@ -178,6 +178,7 @@ thread.isDone          //返回当前线程是否已运行完成
 ```stove
 System.print(arg)  //输出参数
 System.print()     //输出换行符
+System.gc()        //垃圾回收会自动运行，但是你也可以手动启动
 System.clock       //返回时间戳
 ```
 

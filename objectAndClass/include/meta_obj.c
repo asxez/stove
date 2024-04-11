@@ -15,12 +15,14 @@ ObjModule *newObjModule(VM *vm, const char *modName) {
     //ObjModule是元信息对象，不属于任何一个类
     initObjHeader(vm, &objModule->objHeader, OT_MODULE, NULL);
 
+    pushTmpRoot(vm, (ObjHeader *) objModule);
     StringBufferInit(&objModule->moduleVarName);
     ValueBufferInit(&objModule->moduleVarValue);
 
     objModule->name = NULL; //核心模块名为null
     if (modName != NULL)
         objModule->name = newObjString(vm, modName, strlen(modName));
+    popTmpRoot(vm);
     return objModule;
 }
 

@@ -1371,6 +1371,12 @@ static bool primSystemClock(VM *vm UNUSED, Value *args UNUSED) {
     RET_NUM((double) time(NULL))
 }
 
+//System.gc()：启动gc
+static bool primSystemGC(VM *vm, Value *args) {
+    startGC(vm);
+    RET_NULL
+}
+
 //System.importModule(_)：导入并编译模块args[1]，把模块挂载到vm->allModules
 static bool primSystemImportModule(VM *vm, Value *args) {
     if (!validateString(vm, args[1])) //模块名为字符串
@@ -1448,7 +1454,10 @@ static ObjThread *loadModule(VM *vm, Value moduleName, const char *moduleCode) {
         ASSERT(newModuleName->value.start[newModuleName->value.length] == EOS,
                "string.value.start is not terminated.");
         module = newObjModule(vm, newModuleName->value.start);
+
+        pushTmpRoot(vm, (ObjHeader *) module);
         mapSet(vm, vm->allModules, moduleName, OBJ_TO_VALUE(module));
+        popTmpRoot(vm);
 
         //继承核心模块中的变量
         ObjModule *coreModule = getModule(vm, CORE_MODULE);
@@ -1462,8 +1471,12 @@ static ObjThread *loadModule(VM *vm, Value moduleName, const char *moduleCode) {
     }
 
     ObjFun *fun = compileModule(vm, module, moduleCode);
+    pushTmpRoot(vm, (ObjHeader *) fun);
     ObjClosure *objClosure = newObjClosure(vm, fun);
+    pushTmpRoot(vm, (ObjHeader *) objClosure);
     ObjThread *moduleThread = newObjThread(vm, objClosure);
+    popTmpRoot(vm); // objClosure
+    popTmpRoot(vm); // fn
 
     return moduleThread;
 }
@@ -1549,7 +1562,10 @@ VMResult executeModule(VM *vm, Value moduleName, const char *moduleCode) {
 void buildCore(VM *vm) {
     // 创建核心模块，录入到vm->allModules
     ObjModule *coreModule = newObjModule(vm, NULL);
+
+    pushTmpRoot(vm, (ObjHeader *) coreModule);
     mapSet(vm, vm->allModules, CORE_MODULE, OBJ_TO_VALUE(coreModule));
+    popTmpRoot(vm);
 
     //创建object类并绑定方法
     vm->objectClass = defineClass(vm, coreModule, "object");
@@ -1757,6 +1773,7 @@ void buildCore(VM *vm) {
         systemClass->objHeader.class = systemClass;
 
     PRIM_METHOD_BIND(systemClass->objHeader.class, "clock", primSystemClock)
+    PRIM_METHOD_BIND(systemClass->objHeader.class, "gc()", primSystemGC)
     PRIM_METHOD_BIND(systemClass->objHeader.class, "importModule(_)", primSystemImportModule)
     PRIM_METHOD_BIND(systemClass->objHeader.class, "getModuleVariable(_,_)", primSystemGetModuleVariable)
     PRIM_METHOD_BIND(systemClass->objHeader.class, "writeString_(_)", primSystemWriteString)

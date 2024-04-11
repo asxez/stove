@@ -169,6 +169,9 @@ Value removeKey(VM *vm, ObjMap *objMap, Value key) {
     entry->key = VT_TO_VALUE(VT_UNDEFINED);
     entry->value = VT_TO_VALUE(VT_TRUE); //值为真，伪删除
 
+    if (VALUE_IS_OBJ(value)) {
+        pushTmpRoot(vm, VALUE_TO_OBJ(value));
+    }
     objMap->count--;
     if (objMap->count == 0)
         clearMap(vm, objMap);
@@ -179,5 +182,9 @@ Value removeKey(VM *vm, ObjMap *objMap, Value key) {
             newCapacity = MIN_CAPACITY;
         resizeMap(vm, objMap, newCapacity);
     }
+    if (VALUE_IS_OBJ(value)) {
+        popTmpRoot(vm);
+    }
+
     return value;
 }

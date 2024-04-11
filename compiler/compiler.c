@@ -185,6 +185,9 @@ int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t len
             MEM_ERROR("length of identifier \"%s\" should be no more than %d", id, MAX_ID_LEN);
     }
 
+    if (VALUE_IS_OBJ(value))
+        pushTmpRoot(vm, VALUE_TO_OBJ(value));
+
     //从模块变量名中查找变量，若不存在就添加
     int symbolIndex = getIndexFromSymbolTable(&objModule->moduleVarName, name, length);
     if (symbolIndex == -1) {
@@ -196,12 +199,19 @@ int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t len
     else
         symbolIndex = -1;
 
+    if (VALUE_IS_OBJ(value))
+        popTmpRoot(vm);
+
     return symbolIndex;
 }
 
 //添加常量并返回其索引
 static uint32_t addConstant(CompileUnit *cu, Value constant) {
+    if (VALUE_IS_OBJ(constant))
+        pushTmpRoot(cu->curParser->vm, VALUE_TO_OBJ(constant));
     ValueBufferAdd(cu->curParser->vm, &cu->fun->constants, constant);
+    if (VALUE_IS_OBJ(constant))
+        popTmpRoot(cu->curParser->vm);
     return cu->fun->constants.count - 1;
 }
 
@@ -2103,4 +2113,18 @@ ObjFun *compileModule(VM *vm, ObjModule *objModule, const char *moduleCode) {
 #else
     return endCompileUnit(&moduleCU);
 #endif
+}
+
+//标识compileUnit使用的所有堆分配的对象(及其所有父对象)可达,以使它们不被GC收集
+void grayCompileUnit(VM *vm, CompileUnit *cu) {
+    grayValue(vm, vm->curParser->curToken.value);
+    grayValue(vm, vm->curParser->preToken.value);
+
+    //向上遍历父编译器外层链 使其fun可到达
+    //编译结束后，vm->curParser会在endCompileUnit中置为NULL，本函数是在编译过程中调用的，即vm->curParser肯定不为NULL,
+    ASSERT(vm->curParser != NULL, "only called while compiling.");
+    do {
+        grayObject(vm, (ObjHeader *) cu->fun);
+        cu = cu->enclosingUnit;
+    } while (cu != NULL);
 }

@@ -183,6 +183,7 @@ thread.isDone          //return whether the current thread has run completely
 ```stove
 System.print(arg)  //output arg
 System.print()     //without arg will output "\n"
+System.gc()        //garbage collection runs automatically, but you can also start it manually
 System.clock       //it's return timestamp
 ```
 

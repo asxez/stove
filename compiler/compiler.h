@@ -6,6 +6,7 @@
 #define STOVE_COMPILER_H
 
 #include "../objectAndClass/include/obj_fun.h"
+#include "../gc/gc.h"
 
 #define MAX_LOCAL_VAR_NUM 128
 #define MAX_UPVALUE_NUM 128
@@ -73,5 +74,6 @@ typedef struct compileUnit CompileUnit;
 uint32_t getBytesOfOperands(Byte *instrStream, Value *constants, int ip);
 int defineModuleVar(VM *vm, ObjModule *objModule, const char *name, uint32_t length, Value value);
 ObjFun *compileModule(VM *vm, ObjModule *objModule, const char *moduleCode);
+void grayCompileUnit(VM *vm, CompileUnit *cu);
 
 #endif //STOVE_COMPILER_H

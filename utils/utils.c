@@ -4,6 +4,7 @@
 #include "../lexicalParser/include/parser.h"
 #include <stdlib.h>
 #include <stdarg.h>
+#include "../gc/gc.h"
 
 void *memManager(VM *vm, void *ptr, uint32_t oldSize, uint32_t newSize) {
     //累计系统分配的总内存
@@ -14,6 +15,11 @@ void *memManager(VM *vm, void *ptr, uint32_t oldSize, uint32_t newSize) {
         free(ptr);
         return NULL;
     }
+
+    //在分配内存时若达到了GC触发的阈值则启动垃圾回收
+    if (newSize > 0 && vm->allocatedBytes > vm->config.nextGC)
+        startGC(vm);
+
     return realloc(ptr, newSize);
 }
 
