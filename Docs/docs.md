@@ -49,3 +49,6 @@ expression函数是TDOP的核心，它的参数是一个右绑定权值。原理
 
 可参考文献：[Top Down Operator Precedence](https://crockford.com/javascript/tdop/tdop.html)
 [Top Down Operator Precedence](https://crockford.com/javascript/tdop/index.html)
+
+## 垃圾回收
+Stove的垃圾回收算法采用的是标记-清扫回收算法。白色为垃圾对象，灰色为正在处理的对象，黑色为需保留的对象。
