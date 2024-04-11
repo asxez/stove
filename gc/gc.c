@@ -5,7 +5,7 @@
 #include "gc.h"
 #include "../compiler/compiler.h"
 #include "../objectAndClass/include/obj_list.h"
-#include "../objectAndClass/include/obj_range.h"
+#include "../lexicalParser/include/parser.h"
 
 #if DEBUG
 #include "debug.h"
@@ -291,12 +291,13 @@ void freeObject(VM *vm, ObjHeader *obj) {
         case OT_CLASS:
             MethodBufferClear(vm, &((Class *) obj)->methods);
             break;
-        case OT_THREAD:
+        case OT_THREAD: {
             ObjThread *objThread = (ObjThread *) obj;
             DEALLOCATE(vm, objThread->frames);
             DEALLOCATE(vm, objThread->stack);
             break;
-        case OT_FUNCTION:
+        }
+        case OT_FUNCTION: {
             ObjFun *objFun = (ObjFun *) obj;
             ValueBufferClear(vm, &objFun->constants);
             ByteBufferClear(vm, &objFun->instrStream);
@@ -306,6 +307,7 @@ void freeObject(VM *vm, ObjHeader *obj) {
             DEALLOCATE(vm, objFun->debug);
 #endif
             break;
+        }
         case OT_LIST:
             ValueBufferClear(vm, &((ObjList *) obj)->elements);
             break;

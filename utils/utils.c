@@ -4,7 +4,6 @@
 #include "../lexicalParser/include/parser.h"
 #include <stdlib.h>
 #include <stdarg.h>
-#include "../gc/gc.h"
 
 void *memManager(VM *vm, void *ptr, uint32_t oldSize, uint32_t newSize) {
     //累计系统分配的总内存

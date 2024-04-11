@@ -8,6 +8,7 @@
 
 void grayObject(VM *vm, ObjHeader *obj);
 void grayValue(VM *vm, Value value);
+void freeObject(VM *vm, ObjHeader *obj);
 void startGC(VM *vm);
 
 #endif //STOVE_GC_H

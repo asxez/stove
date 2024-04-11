@@ -2,7 +2,7 @@
 // Created by asxe on 2024/1/28.
 //
 
-#include "parser.h"
+#include "./parser.h"
 #include <stdlib.h>
 #include "../../utils/unicodeUtf8.h"
 #include <string.h>
