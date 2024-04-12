@@ -17,7 +17,7 @@ bool valueIsEqual(Value a, Value b) {
         return false;
 
     if (a.type == VT_NUM)
-        return a.num == b.num;
+        return (bool) (a.num == b.num);
 
     if (a.objHeader == b.objHeader)
         return true;
@@ -28,14 +28,14 @@ bool valueIsEqual(Value a, Value b) {
     if (a.objHeader->objType == OT_STRING) {
         ObjString *strA = VALUE_TO_OBJSTR(a);
         ObjString *strB = VALUE_TO_OBJSTR(b);
-        return (strA->value.length == strB->value.length &&
+        return (bool) (strA->value.length == strB->value.length &&
                        memcmp(strA->value.start, strB->value.start, strA->value.length) == 0);
     }
 
     if (a.objHeader->objType == OT_RANGE) {
         ObjRange *rgA = VALUE_TO_OBJRANGE(a);
         ObjRange *rgB = VALUE_TO_OBJRANGE(b);
-        return (rgA->from == rgB->from && rgA->to == rgB->to);
+        return (bool) (rgA->from == rgB->from && rgA->to == rgB->to);
     }
 
     return false;
@@ -70,6 +70,7 @@ Class *newClass(VM *vm, ObjString *className, uint32_t fieldNum, Class *superCla
     //先创建子类的meta类
     Class *metaClass = newRawClass(vm, newClassName, 0);
     metaClass->objHeader.class = vm->classOfClass;
+    pushTmpRoot(vm, (ObjHeader *) metaClass);
 
     //绑定classOfClass为meta类的基类，所有类的meta类的基类都是classOfClass
     bindSuperClass(vm, metaClass, vm->classOfClass);
@@ -104,5 +105,4 @@ Class *getClassOfObj(VM *vm, Value object) {
         default:
             NOT_REACHED()
     }
-    return NULL;
 }

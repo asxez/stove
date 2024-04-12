@@ -28,6 +28,8 @@ void initVM(VM *vm) {
 
     //初始化指针数组grayObjects
     vm->grays.grayObjects = (ObjHeader **) malloc(vm->grays.capacity * sizeof(ObjHeader *));
+
+    vm->tmpRootNum = 0;
 }
 
 VM *newVM(void) {
