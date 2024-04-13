@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include "core.h"
 #include "../compiler/compiler.h"
+#include <time.h>
+#include <string.h>
 
 //初始化虚拟机
 void initVM(VM *vm) {
@@ -30,6 +32,12 @@ void initVM(VM *vm) {
     vm->grays.grayObjects = (ObjHeader **) malloc(vm->grays.capacity * sizeof(ObjHeader *));
 
     vm->tmpRootNum = 0;
+
+    time_t build_time = time(NULL);
+    char *time = ctime(&build_time);
+    int len = strlen(time);
+    time[len - 1] = EOS;
+    vm->buildTime = time;
 }
 
 VM *newVM(void) {
@@ -39,6 +47,24 @@ VM *newVM(void) {
     initVM(vm);
     buildCore(vm);
     return vm;
+}
+
+//释放虚拟机
+void freeVM(VM *vm) {
+    ASSERT(vm->allMethodNames.count > 0, "VM have already been freed.");
+
+    //释放所有的对象
+    ObjHeader *objHeader = vm->allObjects;
+    while (objHeader != NULL) {
+        //释放之前先备份下一个节点地址
+        ObjHeader *next = objHeader->next;
+        freeObject(vm, objHeader);
+        objHeader = next;
+    }
+
+    vm->grays.grayObjects = DEALLOCATE(vm, vm->grays.grayObjects);
+    StringBufferClear(vm, &vm->allMethodNames);
+    DEALLOCATE(vm, vm);
 }
 
 //把obj作为临时的根对象，就是把obj添加为gc的白名单，避免被gc回收

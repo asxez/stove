@@ -64,10 +64,13 @@ struct vm {
     //用于存储保留的对象
     Gray grays;
     Configuration config;
+
+    char *buildTime;
 };
 
 void initVM(VM *vm);
 VM *newVM(void);
+void freeVM(VM *vm);
 void pushTmpRoot(VM *vm, ObjHeader *obj);
 void popTmpRoot(VM *vm);
 void ensureStack(VM *vm, ObjThread *objThread, uint32_t neededSlots);
