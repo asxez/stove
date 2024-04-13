@@ -1,5 +1,5 @@
 CC = gcc
-#CFLAGS = -g -DDEBUG -lm -Wall -I include -I cli -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
+#CFLAGS = -g -DDEBUG -lm -Wall -I lexicalParser/include -I cli -I compiler -I objectAndClass/include -I utils -I vm -I gc -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -fgnu89-inline
 CFLAGS = -g -lm -Wall -I lexicalParser/include -I cli -I compiler -I objectAndClass/include -I utils -I vm -I gc -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
 
 TARGET = stove

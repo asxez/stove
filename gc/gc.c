@@ -8,7 +8,7 @@
 #include "../lexicalParser/include/parser.h"
 
 #if DEBUG
-#include "debug.h"
+#include "../compiler/debug.h"
 #include <time.h>
 #endif
 
@@ -134,7 +134,7 @@ static void blackFun(VM *vm, ObjFun *fun) {
 
 #if DEBUG
     //再加上debug信息占用的内存
-    vm.allocatedBytes += sizeof(Int) * fun.instrStream.capacity;
+    vm->allocatedBytes += sizeof(Int) * fun->instrStream.capacity;
 #endif
 }
 
@@ -366,7 +366,7 @@ void startGC(VM *vm) {
     ObjHeader **obj = &vm->allObjects;
     while (*obj != NULL) {
         //回收白色对象
-        if (~((*obj)->isDark)) {
+        if (!((*obj)->isDark)) {
             ObjHeader *unreached = *obj;
             *obj = unreached->next;
             freeObject(vm, unreached);
@@ -389,6 +389,6 @@ void startGC(VM *vm) {
            (unsigned long) vm->allocatedBytes,
            (unsigned long) (before - vm->allocatedBytes),
            (unsigned long) vm->config.nextGC,
-           elapsed)
+           elapsed);
 #endif
 }

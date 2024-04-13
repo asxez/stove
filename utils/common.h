@@ -21,14 +21,12 @@ typedef struct class Class;
 #define UNUSED __attribute__((unused))
 
 #ifdef DEBUG
-#define ASSERT(exp, errMsg)                                                                                   \
-    do                                                                                                        \
-    {                                                                                                         \
-        if (!(exp))                                                                                           \
-        {                                                                                                     \
-            fprintf(stderr, "ASSERT failed! %s:%d In function %s()\n", __FILE__, __LINE__, __func__, errMsg); \
-            abort();                                                                                          \
-        }                                                                                                     \
+#define ASSERT(exp, errMsg)                                                                                       \
+    do {                                                                                                          \
+        if (!(exp)) {                                                                                             \
+            fprintf(stderr, "ASSERT failed! %s:%d In function %s(): %s\n", __FILE__, __LINE__, __func__, errMsg); \
+            abort();                                                                                              \
+        }                                                                                                         \
     } while (0);
 
 #else
@@ -36,8 +34,7 @@ typedef struct class Class;
 #endif
 
 #define NOT_REACHED()                                                                           \
-    do                                                                                          \
-    {                                                                                           \
+    do {                                                                                        \
         fprintf(stderr, "NOT_REACHED: %s:%d In function %s()\n", __FILE__, __LINE__, __func__); \
         while (1);                                                                              \
     } while (0);

@@ -723,7 +723,6 @@ static void compileBody(CompileUnit *cu, bool isConstruct) {
 #if DEBUG
 static ObjFun *endCompileUnit(CompileUnit *cu, const char *debugName, uint32_t debugNameLen) {
     bindDebugFunName(cu->curParser->vm, cu->fun->debug, debugName, debugNameLen);
-}
 #else
 
 static ObjFun *endCompileUnit(CompileUnit *cu) {

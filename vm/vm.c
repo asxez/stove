@@ -9,6 +9,10 @@
 #include <time.h>
 #include <string.h>
 
+#ifdef DEBUG
+#include "../compiler/debug.h"
+#endif
+
 //初始化虚拟机
 void initVM(VM *vm) {
     vm->allocatedBytes = 0;
@@ -734,15 +738,15 @@ DECODE {
             //栈顶：基类 次栈顶：子类名
 
             uint32_t fieldNum = READ_BYTE();
-            Value superClas = curThread->esp[-1]; //基类名
+            Value superClass = curThread->esp[-1]; //基类名
             Value className = curThread->esp[-2]; //子类名
 
             //回收基类所占的栈空间，次栈顶的空间暂时保留，创建的类会直接用该空间
             DROP();
 
             //校验基类合法性，若不合法则停止运行
-            validateSuperClass(vm, className, fieldNum, superClas);
-            Class *class = newClass(vm, VALUE_TO_OBJSTR(className), fieldNum, VALUE_TO_CLASS(superClas));
+            validateSuperClass(vm, className, fieldNum, superClass);
+            Class *class = newClass(vm, VALUE_TO_OBJSTR(className), fieldNum, VALUE_TO_CLASS(superClass));
 
             //类存储于栈底
             stackStart[0] = OBJ_TO_VALUE(class);

@@ -1,1 +1,10 @@
-System.print("this is a test code for Stove.")
+var a = 0
+var t1 = System.clock
+while (a < 1000000) {
+    System.print(a)
+    a = a + 1
+}
+var t2 = System.clock
+System.print(t1)
+System.print(t2)
+System.print(t2 - t1)
