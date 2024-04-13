@@ -1,13 +1,18 @@
 CC = gcc
-#CFLAGS = -g -DDEBUG -lm -Wall -I lexicalParser/include -I cli -I compiler -I objectAndClass/include -I utils -I vm -I gc -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -fgnu89-inline
-CFLAGS = -g -lm -Wall -I lexicalParser/include -I cli -I compiler -I objectAndClass/include -I utils -I vm -I gc -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
+CFLAGS-DEBUG = -g -DDEBUG -lm -Wall -I lexicalParser/include -I cli -I compiler -I objectAndClass/include -I utils -I vm -I gc -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
+CFLAGS-NORMAL = -g -lm -Wall -I lexicalParser/include -I cli -I compiler -I objectAndClass/include -I utils -I vm -I gc -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers
 
 TARGET = stove
 DIRS = lexicalParser/include cli objectAndClass/include utils vm compiler gc
 CFILES = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.c))
 OBJS = $(patsubst %.c,%.o,$(CFILES))
 
-$(TARGET):$(OBJS)
+d: CFLAGS = $(CFLAGS-DEBUG)
+d: $(OBJS)
+	$(CC) -o $(TARGET) $(OBJS) $(CFLAGS-DEBUG)
+
+n: CFLAGS = $(CFLAGS-NORMAL)
+n: $(OBJS)
 	$(CC) -o $(TARGET) $(OBJS) $(CFLAGS)
 
 clean:

@@ -7,7 +7,7 @@ The Stove programming language is an object-oriented, interpreted language.
 ## 🛠️ Build Instructions
 On windows, download the source code and go to the source code folder:
 ```bash
-make
+make n
 ```
 now you will get a file called stove.exe, then:
 ```bash
