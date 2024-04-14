@@ -187,6 +187,20 @@ System.gc()        //garbage collection runs automatically, but you can also sta
 System.clock       //it's return timestamp
 ```
 
+## 🔧 Debug Stove
+You can use this command when building:
+```bash
+make d
+```
+
+## 🦾 Use the command line
+You can use the command line using the following commands:
+```bash
+.\stove.exe
+```
+you should know It only supports a single line of code, for example:
+![](Docs/img/6.png)
+
 ## ❓ Existing problems
 1. The for loop statement fails to iterate, for example:
 ```stove
@@ -195,6 +209,7 @@ for i (1..10) {
 }
 ```
 it will output:
+<br>
 ![](Docs/img/4.png)
 
 2. There is a problem with the way the class is constructed:
@@ -216,6 +231,7 @@ var t = Test.new("stove", "0")
 t.say()
 ```
 it will output an error:
+<br>
 ![](Docs/img/5.png)
 
 ## 🤝 Contribute to the stove

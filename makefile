@@ -19,4 +19,4 @@ clean:
 	-del $(TARGET) $(OBJS)
 	-for %%d in ($(DIRS)) do (del /Q /S "%%d\*.o")
 	-del $(TARGET).exe
-r: clean $(TARGET)
+r: clean n
